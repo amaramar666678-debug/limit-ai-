@@ -606,6 +606,41 @@ class _TopBar extends StatelessWidget {
   const _TopBar({required this.state});
   final AppState state;
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final s = state.current;
+    if (s == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Palette.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Palette.line),
+        ),
+        title: const Text('حذف الجلسة؟'),
+        content: Text(
+          'سيتم حذف «${s.title}» نهائياً من OpenCode.',
+          style: const TextStyle(fontSize: 13, color: Palette.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Palette.danger,
+              foregroundColor: Palette.bg,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await state.deleteCurrent();
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = state.current;
@@ -634,7 +669,13 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           _ModelPicker(state: state),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'حذف الجلسة',
+            icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Palette.danger),
+            onPressed: s == null ? null : () => _confirmDelete(context),
+          ),
+          const SizedBox(width: 4),
           if (s?.busy ?? false)
             OutlinedButton.icon(
               onPressed: state.interruptCurrent,
