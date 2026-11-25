@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'state/app_state.dart';
 import 'ui/app_shell.dart';
+import 'ui/strings.dart';
 import 'ui/theme.dart';
 
 void main() {
@@ -32,11 +33,17 @@ class _LimitAIAppState extends State<LimitAIApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'multi mause',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: AppShell(state: state),
+    return ValueListenableBuilder<String>(
+      valueListenable: AppStrings.locale,
+      builder: (_, locale, _) => Directionality(
+        textDirection: locale == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        child: MaterialApp(
+          title: 'multi mause',
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(),
+          home: AppShell(state: state),
+        ),
+      ),
     );
   }
 }

@@ -1,45 +1,49 @@
 # multi mause
 
-**مساحة عمل ذكية بلغة عربية وسلسة للتحكم بـ OpenCode + فريق من 10 مؤشرات فأرة يعمل معاً.**
+**A lightweight, smooth AI workspace for OpenCode — with a ten-cursor mouse team that works together on Windows.**
 
-`multi mause` هو عميل Flutter خفيف وسريع لـ [OpenCode](https://opencode.ai/) يجمع بين محادثة وكيل ذكي، اختيار النماذج، وقسم **Multi Mause** الذي ينفّذ نقرات فأرة حقيقية في عشرة مواضع بسرعة فائقة. يعمل على **Windows**.
-
----
-
-## 📥 التحميل والتشغيل (أسهل طريقة)
-
-1. افتح صفحة [Releases](https://github.com/amaramar666678-debug/limit-ai-/releases/latest).
-2. نزّل ملف `multi-mause-windows-x64.zip`.
-3. فكّ الضغط وافتح `limit_ai.exe`.
-4. من الإعدادات (⚙️) اضبط:
-   - **OpenCode endpoint** (أو اضغط *Auto-detect*).
-   - **Project directory** = مجلد مشروعك الذي سيعمل عليه الوكيل.
-
-> تحتاج إلى تشغيل خادم OpenCode (`opencode serve` أو تطبيق سطح المكتب) لاستخدام المحادثة واختيار النماذج. قسم Multi Mause يعمل حتى بدونه.
+`multi mause` is a Flutter desktop client for [OpenCode](https://opencode.ai/). It combines a fast AI chat interface, live model selection, and a **Multi Mause** mode that sends ten real mouse clicks to different positions at high speed. The app UI is **English by default**; Arabic can be switched on from Settings.
 
 ---
 
-## ✨المزايا
+## 📥 Download & run (easiest way)
 
-### المحادثة
-- واجهة AI عربية/إنجليزية، داكنة، خفيفة وسلسة مع انتقالات متحركة.
-- اختيار النموذج تلقائياً من `/api/model` مع قائمة احتياطية، ودعم variants مثل `high / max`.
-- أنيميشن حالة الوكيل: **Thinking → Writing → Running tool → Waiting**.
-- حذف الجلسة من الشريط الجانبي أو الشريط العلوي مع تأكيد.
-- عرض أدوات الوكيل، أكواد النتائج، نسخ الكود، وإيقاف التنفيذ.
+1. Go to the latest [Release](https://github.com/amaramar666678-debug/limit-ai-/releases/latest).
+2. Download `multi-mause-windows-x64.zip`.
+3. Extract it and run `limit_ai.exe`.
+4. In Settings (⚙️):
+   - Set the **OpenCode endpoint** (or click *Auto-detect*).
+   - Set the **Project directory** — the folder your agent will work in.
 
-### Multi Mause (الفريق العشرة)
-- **10 مؤشرات** تتحرك وتنقر فعلياً بأنماط: أفقي، عمودي، شبكة 5×2، دائرة، قطري.
-- **تحكم جماعي بالوكيل**: اكتب مثلاً `افتح كروم وابحث عن صور قطط` فيُرسل للوكيل ويبدأ الفريق بفتح المتصفح والبحث وتصفح النتائج.
-- أتمتة لوحة المفاتيح الحقيقية (Win+R، لصق، Enter) لفتح Chrome والبحث عن صور أو معلومات.
-- **تحكم دقيق** بإدخال إحداثيات `X / Y` ونقل/نقر عندها.
-- تحكم بالمسافة والفاصل الزمني ونقر مزدوج، عدّاد 3 ثوانٍ، معاينة مرئية، وإيقاف فوري بـ **Esc**.
+> A running OpenCode server (`opencode serve` or the desktop app) is required for chat and model selection. Multi Mause works even without it.
 
 ---
 
-## 🛠️ البناء من المصدر
+## ✨ Features
 
-يتطلب **Flutter 3.44+** و **Windows 10/11**:
+### AI chat
+- Fast, dark, fluent interface in English (Arabic available in Settings).
+- Model picker loaded from `/api/model` with a built-in fallback list and support for variants such as `high` / `max`.
+- Live agent status animation: **Thinking → Writing → Running tool → Waiting**.
+- Delete sessions from the sidebar or the top bar, with confirmation.
+- Tool calls, code blocks, copy button, and interrupt support.
+
+### Multi Mause — the ten-cursor team
+- **10 cursors** that move and click in patterns: row, column, 5×2 grid, circle, and diagonal.
+- **Agent team control**: type something like `open Chrome and search for cat images`; the instruction is sent to the agent while the team carries it out on the desktop.
+- Real keyboard automation (Win+R, paste, Enter) to launch Chrome and search for images or information.
+- **Precise control** with manual `X / Y` coordinates plus Move/Click buttons.
+- Adjustable spacing and click interval, double-click mode, 3-second countdown, live preview, and instant stop with **Esc**.
+
+### Language
+- English is the default language.
+- Open **Settings → Language** and choose **العربية** to switch the interface to Arabic.
+
+---
+
+## 🛠️ Build from source
+
+Requires **Flutter 3.44+** and **Windows 10/11**:
 
 ```powershell
 git clone https://github.com/amaramar666678-debug/limit-ai-.git
@@ -49,9 +53,9 @@ dart run tool/generate_icon.dart
 flutter build windows
 ```
 
-النتيجة: `build\x64\runner\Release\` — انسخ مجلد `Release` بالكامل (كل الـ DLLs مطلوبة).
+Output: `build\x64\runner\Release\` — copy the whole `Release` folder (all DLLs are required).
 
-للتشغيل أثناء التطوير:
+For development:
 
 ```powershell
 flutter run -d windows
@@ -59,15 +63,21 @@ flutter run -d windows
 
 ---
 
-## ℹ️ ملاحظات مهمة
+## ℹ️ Important notes
 
-- Windows يوفّر **مؤشراً فعلياً واحداً فقط**؛ لذلك تُنفّذ إجراءات المؤشرات العشرة بسرعة متتالية مع عرض بصري لكل مؤشر على حدة، وليست عشرة مؤشرات مستقلة على مستوى النظام.
-- النقرات حقيقية وتؤثر على التطبيقات المفتوحة؛ استخدم زر الإيقاف أو Esc فوراً عند الحاجة.
-- الشعار الرسمي موجود في `assets/logo_multi_mause.webp`، ويُستخدم أيضاً كأيقونة للتطبيق.
+- Windows exposes **only one physical cursor**. The ten team actions are therefore executed in rapid sequence with a visual indicator for each cursor, rather than ten independent system cursors.
+- Clicks are real and affect open applications. Use the Stop button or **Esc** at any time.
+- The official logo lives at `assets/logo_multi_mause.webp` and is also used as the Windows app icon.
 
 ---
 
-## 📁 المشروع
+## 📁 Repository
 
-- المستودع: https://github.com/amaramar666678-debug/limit-ai-
-- المبني بـ Flutter + Dart، ويعتمد على OpenCode HTTP API.
+- Source: https://github.com/amaramar666678-debug/limit-ai-
+- Built with Flutter + Dart on top of the OpenCode HTTP API.
+
+---
+
+## نسخة عربية مختصرة
+
+**multi mause** — مساحة عمل ذكية لـ OpenCode مع فريق من 10 مؤشرات فأرة حقيقية على Windows. اللغة الافتراضية هي الإنجليزية، ويمكن تغييرها إلى العربية من الإعدادات. التحميل: [أحدث إصدار](https://github.com/amaramar666678-debug/limit-ai-/releases/latest).

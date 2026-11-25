@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../ui/strings.dart';
 import 'mouse_controller.dart';
 
 enum TeamActionKind { launch, paste, enter, click, doubleClick, move, scroll, delay }
@@ -87,13 +88,13 @@ class MouseTaskPlanner {
         TeamActionKind.launch,
         text: command,
         cursor: 0,
-        label: 'فتح كروم وتحميل الصفحة',
+        label: AppStrings.launchChrome,
       ),
-      const TeamAction(
+      TeamAction(
         TeamActionKind.delay,
         durationMs: 2600,
         cursor: 1,
-        label: 'انتظار جاهزية النتائج',
+        label: AppStrings.waitResults,
       ),
     ];
 
@@ -108,13 +109,13 @@ class MouseTaskPlanner {
         TeamActionKind.click,
         point: points[i],
         cursor: i,
-        label: wantsImage ? 'فحص الصورة ${i + 1}' : 'فحص النتيجة ${i + 1}',
+        label: wantsImage ? AppStrings.checkImage(i + 1) : AppStrings.checkResult(i + 1),
       ));
     }
 
     return MouseTask(
-      title: wantsImage ? 'بحث جماعي عن صور' : 'بحث جماعي عن معلومات',
-      description: wantsImage ? 'صور: $q' : 'معلومات: $q',
+      title: wantsImage ? AppStrings.imageSearch : AppStrings.infoSearch,
+      description: wantsImage ? AppStrings.imagesLabel(q) : AppStrings.infoLabel(q),
       actions: actions,
     );
   }
@@ -131,15 +132,15 @@ class MouseTaskPlanner {
       spacing: spacing,
     );
     return MouseTask(
-      title: 'تنفيذ جماعي بـ 10 مؤشرات',
-      description: 'نقرات ${doubleClick ? 'مزدوجة' : 'عادية'} حقيقية حسب النمط المختار',
+      title: AppStrings.teamClicks,
+      description: AppStrings.clickDescription(doubleClick),
       actions: [
         for (var i = 0; i < points.length; i++)
           TeamAction(
             doubleClick ? TeamActionKind.doubleClick : TeamActionKind.click,
             point: points[i],
             cursor: i,
-            label: 'المؤشر ${i + 1}',
+            label: AppStrings.cursorLabel(i + 1),
           ),
       ],
     );

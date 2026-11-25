@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../services/mouse_controller.dart';
 import '../services/mouse_task.dart';
 import 'logo.dart';
+import 'strings.dart';
 import 'theme.dart';
 
 class MultiMousePage extends StatefulWidget {
@@ -85,7 +86,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
     final x = int.tryParse(_xCtrl.text.trim());
     final y = int.tryParse(_yCtrl.text.trim());
     if (x == null || y == null) {
-      setState(() => _error = 'أدخل إحداثيات X و Y كأرقام صحيحة.');
+      setState(() => _error = AppStrings.invalidCoords);
       return null;
     }
     return Offset(x.toDouble(), y.toDouble());
@@ -328,9 +329,9 @@ class _MultiMousePageState extends State<MultiMousePage> {
             children: [
               const Icon(Icons.smart_toy_outlined, size: 18, color: Palette.accent),
               const SizedBox(width: 8),
-              const Text(
-                'التحكم الجماعي بالوكيل',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              Text(
+                AppStrings.aiTeamControl,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               Container(
@@ -339,17 +340,17 @@ class _MultiMousePageState extends State<MultiMousePage> {
                   color: const Color(0x3367C7B7),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'فريق من 10',
-                  style: TextStyle(fontSize: 10.5, color: Palette.accent, fontWeight: FontWeight.w700),
+                child: Text(
+                  AppStrings.teamOfTen,
+                  style: const TextStyle(fontSize: 10.5, color: Palette.accent, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'اكتب المهمة للوكيل — مثلاً: «افتح كروم وابحث عن صور قطط» — فيرسلها إلى الوكيل ويبدأ الفريق بتنفيذها على سطح المكتب.',
-            style: TextStyle(fontSize: 12.5, color: Palette.muted, height: 1.5),
+          Text(
+            AppStrings.aiTeamDescription,
+            style: const TextStyle(fontSize: 12.5, color: Palette.muted, height: 1.5),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -360,7 +361,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
             cursorColor: Palette.accent,
             style: const TextStyle(fontSize: 13.5),
             decoration: InputDecoration(
-              hintText: 'مثال: افتح كروم وابحث عن صور قطط',
+              hintText: AppStrings.aiTaskHint,
               hintStyle: const TextStyle(color: Palette.muted),
               filled: true,
               fillColor: Palette.bg,
@@ -399,7 +400,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
                   ),
                 ),
                 Text(
-                  _activeIndex >= 0 ? 'المؤشر ${_activeIndex + 1}/10' : '',
+                  _activeIndex >= 0 ? AppStrings.cursorProgress(_activeIndex) : '',
                   style: monoStyle(size: 11, color: Palette.muted),
                 ),
               ],
@@ -421,8 +422,8 @@ class _MultiMousePageState extends State<MultiMousePage> {
                     ),
                     label: Text(
                       _running
-                          ? (_countdown > 0 ? 'البدء بعد $_countdown' : 'الفريق يعمل...')
-                          : 'أرسل للوكيل وشغّل الفريق',
+                          ? (_countdown > 0 ? AppStrings.startingIn(_countdown) : AppStrings.teamWorking)
+                          : AppStrings.runTeam,
                       style: const TextStyle(fontSize: 13),
                     ),
                     style: FilledButton.styleFrom(
@@ -437,7 +438,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
                 OutlinedButton.icon(
                   onPressed: _running ? _stop : null,
                   icon: const Icon(Icons.stop_rounded, size: 16),
-                  label: const Text('إيقاف'),
+                  label: Text(AppStrings.stop),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Palette.danger,
                     side: const BorderSide(color: Palette.line),
@@ -468,7 +469,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
               ),
               const SizedBox(height: 3),
               Text(
-                'عشرة مؤشرات تنفّذ النقرات في مواضع مختلفة بسرعة فائقة',
+                AppStrings.mouseSubtitle,
                 style: TextStyle(fontSize: 13, color: Palette.muted),
               ),
             ],
@@ -491,7 +492,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
               ),
               const SizedBox(width: 6),
               Text(
-                _controller == null ? 'غير مدعوم' : 'Windows جاهز',
+                _controller == null ? AppStrings.notSupported : AppStrings.windowsReady,
                 style: const TextStyle(fontSize: 12),
               ),
             ],
@@ -534,7 +535,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
             children: [
               const Icon(Icons.my_location_rounded, size: 17, color: Palette.accent),
               const SizedBox(width: 8),
-              const Text('المعاينة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              Text(AppStrings.preview, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               const Spacer(),
               Switch(
                 value: _showPreview,
@@ -572,7 +573,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
                       )
                     : Center(
                         child: Text(
-                          'المعاينة متوقفة',
+                          AppStrings.previewPaused,
                           style: TextStyle(color: Palette.muted, fontSize: 13),
                         ),
                       ),
@@ -587,15 +588,15 @@ class _MultiMousePageState extends State<MultiMousePage> {
               Expanded(
                 child: Text(
                   _origin == null
-                      ? 'جارٍ تحديد موضع المؤشر...'
-                      : 'الموضع: ${_origin!.dx.round()} × ${_origin!.dy.round()}',
+                      ? AppStrings.locatingPointer
+                      : AppStrings.position(_origin!.dx, _origin!.dy),
                   style: monoStyle(size: 12, color: Palette.muted),
                 ),
               ),
               TextButton.icon(
                 onPressed: _capture,
                 icon: const Icon(Icons.center_focus_strong_rounded, size: 16),
-                label: const Text('التقاط المؤشر'),
+                label: Text(AppStrings.capturePointer),
               ),
             ],
           ),
@@ -604,7 +605,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
             children: [
               const Icon(Icons.precision_manufacturing_outlined, size: 14, color: Palette.muted),
               const SizedBox(width: 6),
-              const Text('تحكم دقيق:', style: TextStyle(fontSize: 12, color: Palette.muted)),
+              Text(AppStrings.preciseControl, style: const TextStyle(fontSize: 12, color: Palette.muted)),
               const SizedBox(width: 8),
               SizedBox(
                 width: 78,
@@ -635,7 +636,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('نقل', style: TextStyle(fontSize: 12)),
+                child: Text(AppStrings.move, style: const TextStyle(fontSize: 12)),
               ),
               const SizedBox(width: 6),
               FilledButton(
@@ -646,7 +647,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('نقر', style: TextStyle(fontSize: 12)),
+                child: Text(AppStrings.click, style: const TextStyle(fontSize: 12)),
               ),
             ],
           ),
@@ -676,11 +677,11 @@ class _MultiMousePageState extends State<MultiMousePage> {
             children: [
               Icon(Icons.tune_rounded, size: 17, color: Palette.accent),
               SizedBox(width: 8),
-              Text('الإعدادات', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              Text('Settings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 16),
-          const Text('النمط', style: TextStyle(fontSize: 12.5, color: Palette.muted)),
+          Text(AppStrings.pattern, style: const TextStyle(fontSize: 12.5, color: Palette.muted)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -708,7 +709,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
           const SizedBox(height: 18),
           Row(
             children: [
-              const Text('المسافة', style: TextStyle(fontSize: 12.5, color: Palette.muted)),
+              Text(AppStrings.spacing, style: const TextStyle(fontSize: 12.5, color: Palette.muted)),
               const Spacer(),
               Text('${_spacing.round()} px', style: monoStyle(size: 12, color: Palette.accent)),
             ],
@@ -725,7 +726,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
           ),
           Row(
             children: [
-              const Text('الفاصل بين النقرات', style: TextStyle(fontSize: 12.5, color: Palette.muted)),
+              Text(AppStrings.clickInterval, style: const TextStyle(fontSize: 12.5, color: Palette.muted)),
               const Spacer(),
               Text('$_delayMs ms', style: monoStyle(size: 12, color: Palette.accent)),
             ],
@@ -744,7 +745,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
             contentPadding: EdgeInsets.zero,
             value: _doubleClick,
             onChanged: _running ? null : (v) => setState(() => _doubleClick = v),
-            title: const Text('نقر مزدوج', style: TextStyle(fontSize: 13)),
+            title: Text(AppStrings.doubleClick, style: const TextStyle(fontSize: 13)),
             activeThumbColor: Palette.accent,
           ),
           const SizedBox(height: 10),
@@ -755,15 +756,15 @@ class _MultiMousePageState extends State<MultiMousePage> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0x4467C7B7)),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline_rounded, size: 16, color: Palette.accent),
-                SizedBox(width: 8),
+                const Icon(Icons.info_outline_rounded, size: 16, color: Palette.accent),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'تنفّذ نقرات حقيقية على سطح المكتب. اضغط Esc أو زر الإيقاف في أي وقت.',
-                    style: TextStyle(fontSize: 11.5, color: Palette.muted, height: 1.5),
+                    AppStrings.realClicksNote,
+                    style: const TextStyle(fontSize: 11.5, color: Palette.muted, height: 1.5),
                   ),
                 ),
               ],
@@ -780,8 +781,8 @@ class _MultiMousePageState extends State<MultiMousePage> {
                   icon: Icon(_running ? Icons.hourglass_top : Icons.bolt_rounded, size: 18),
                   label: Text(
                     _running
-                        ? (_countdown > 0 ? 'البدء بعد $_countdown' : 'جارٍ التنفيذ...')
-                        : 'تشغيل 10 نقرات',
+                        ? (_countdown > 0 ? AppStrings.startingIn(_countdown) : AppStrings.executing)
+                        : AppStrings.runTenClicks,
                     style: const TextStyle(fontSize: 13),
                   ),
                   style: FilledButton.styleFrom(
@@ -796,7 +797,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
               OutlinedButton.icon(
                 onPressed: _running ? _stop : null,
                 icon: const Icon(Icons.stop_rounded, size: 17),
-                label: const Text('إيقاف'),
+                label: Text(AppStrings.stop),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Palette.danger,
                   side: const BorderSide(color: Palette.line),

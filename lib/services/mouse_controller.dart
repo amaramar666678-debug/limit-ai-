@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:ffi/ffi.dart';
 import 'package:flutter/services.dart';
+import '../ui/strings.dart';
 
 final class _Point extends Struct {
   @Int32()
@@ -208,10 +209,10 @@ enum MousePattern { row, column, grid, circle, diagonal }
 
 extension MousePatternLabel on MousePattern {
   String get label => switch (this) {
-        MousePattern.row => 'أفقي',
-        MousePattern.column => 'عمودي',
-        MousePattern.grid => 'شبكة 5×2',
-        MousePattern.circle => 'دائرة',
-        MousePattern.diagonal => 'قطري',
+        MousePattern.row => AppStrings.patternRow,
+        MousePattern.column => AppStrings.patternColumn,
+        MousePattern.grid => AppStrings.patternGrid,
+        MousePattern.circle => AppStrings.patternCircle,
+        MousePattern.diagonal => AppStrings.patternDiagonal,
       };
 }

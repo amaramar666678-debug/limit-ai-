@@ -6,6 +6,7 @@ import '../models/model_info.dart';
 import '../state/app_state.dart';
 import 'logo.dart';
 import 'multi_mouse_page.dart';
+import 'strings.dart';
 import 'theme.dart';
 
 TextDirection dirOf(String s) {
@@ -102,7 +103,7 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 18),
           _NavButton(
             icon: Icons.chat_bubble_outline_rounded,
-            label: 'المحادثة',
+            label: AppStrings.chat,
             selected: inChat,
             onTap: () => state.setSection(AppSection.chat),
           ),
@@ -193,9 +194,9 @@ class _Sidebar extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
-                  const Text(
-                    'اضغط Esc للإيقاف الفوري أثناء التنفيذ.',
-                    style: TextStyle(fontSize: 11.5, color: Palette.muted, height: 1.5),
+                  Text(
+                    AppStrings.escNote,
+                    style: const TextStyle(fontSize: 11.5, color: Palette.muted, height: 1.5),
                   ),
                 ],
               ),
@@ -385,20 +386,20 @@ class _SessionTileState extends State<_SessionTile> {
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: Palette.line),
         ),
-        title: const Text('حذف المحادثة؟'),
+        title: Text(AppStrings.deleteChatTitle),
         content: Text(
-          'سيتم حذف «${widget.info.title}» من OpenCode. لا يمكن التراجع.',
+          AppStrings.deleteChatBody(widget.info.title),
           style: const TextStyle(fontSize: 13, color: Palette.muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
+            child: Text(AppStrings.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Palette.danger, foregroundColor: Palette.bg),
-            child: const Text('حذف'),
+            child: Text(AppStrings.delete),
           ),
         ],
       ),
@@ -447,7 +448,7 @@ class _SessionTileState extends State<_SessionTile> {
                 duration: const Duration(milliseconds: 120),
                 opacity: _hover || widget.selected ? 1 : 0,
                 child: IconButton(
-                  tooltip: 'حذف المحادثة',
+                  tooltip: AppStrings.deleteChatTooltip,
                   iconSize: 15,
                   padding: const EdgeInsets.only(right: 4),
                   color: Palette.danger,
@@ -617,15 +618,15 @@ class _TopBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: Palette.line),
         ),
-        title: const Text('حذف الجلسة؟'),
+        title: Text(AppStrings.deleteSessionTitle),
         content: Text(
-          'سيتم حذف «${s.title}» نهائياً من OpenCode.',
+          AppStrings.deleteSessionBody(s.title),
           style: const TextStyle(fontSize: 13, color: Palette.muted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
+            child: Text(AppStrings.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -633,7 +634,7 @@ class _TopBar extends StatelessWidget {
               backgroundColor: Palette.danger,
               foregroundColor: Palette.bg,
             ),
-            child: const Text('حذف'),
+            child: Text(AppStrings.delete),
           ),
         ],
       ),
@@ -671,7 +672,7 @@ class _TopBar extends StatelessWidget {
           _ModelPicker(state: state),
           const SizedBox(width: 8),
           IconButton(
-            tooltip: 'حذف الجلسة',
+            tooltip: AppStrings.deleteSessionTooltip,
             icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Palette.danger),
             onPressed: s == null ? null : () => _confirmDelete(context),
           ),
@@ -704,7 +705,7 @@ class _ModelPicker extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         PopupMenuButton<ModelOption>(
-          tooltip: 'اختر النموذج',
+          tooltip: AppStrings.chooseModel,
           color: Palette.surface,
           elevation: 12,
           shape: RoundedRectangleBorder(
@@ -890,11 +891,11 @@ class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onPick, required this.directory});
   final void Function(String) onPick;
   final String directory;
-  static const _ideas = [
-    'راجع المشروع واشرح هيكله',
-    'Fix bugs and run tests',
-    'نفّذ مهمة في المشروع الحالي',
-  ];
+  List<String> get _ideas => [
+        AppStrings.ideaReview,
+        AppStrings.ideaFix,
+        AppStrings.ideaTask,
+      ];
 
   @override
   Widget build(BuildContext context) => Center(
@@ -1517,6 +1518,40 @@ Future<void> _showSettings(BuildContext context, AppState state) async {
               const Text('Project directory (where agent runs)', style: TextStyle(fontSize: 12, color: Palette.muted)),
               const SizedBox(height: 6),
               TextField(controller: dirCtrl, style: monoStyle(size: 13), decoration: _inputDeco(r'C:\path\to\project')),
+              const SizedBox(height: 14),
+              ValueListenableBuilder<String>(
+                valueListenable: AppStrings.locale,
+                builder: (_, code, _) => Row(
+                  children: [
+                    Text(
+                      AppStrings.language,
+                      style: const TextStyle(fontSize: 12, color: Palette.muted),
+                    ),
+                    const Spacer(),
+                    ToggleButtons(
+                      isSelected: [code == 'en', code == 'ar'],
+                      onPressed: (i) => AppStrings.setLocale(i == 0 ? 'en' : 'ar'),
+                      borderRadius: BorderRadius.circular(8),
+                      borderColor: Palette.line,
+                      selectedBorderColor: Palette.accent,
+                      selectedColor: Palette.bg,
+                      fillColor: Palette.accent,
+                      color: Palette.muted,
+                      constraints: const BoxConstraints(minHeight: 30, minWidth: 62),
+                      children: const [
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('English', style: TextStyle(fontSize: 12)),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Text('العربية', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 10),
               Text(
                 state.username != null
