@@ -1,8 +1,11 @@
 ﻿import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/chat_models.dart';
+import '../models/model_info.dart';
 import '../services/opencode_api.dart';
 import '../services/opencode_discovery.dart';
+
+enum AppSection { chat, multiMouse }
 
 class AppState extends ChangeNotifier {
   AppState({String endpoint = '127.0.0.1:4096', this.directory = ''})
@@ -23,9 +26,29 @@ class AppState extends ChangeNotifier {
   StreamSubscription<OpenCodeEvent>? _eventSub;
   bool _eventsRunning = false;
 
+  AppSection section = AppSection.chat;
+  List<ModelOption> models = List.of(ModelOption.fallback);
+  ModelOption? selectedModel;
+  String? selectedVariant;
+  bool modelsLoaded = false;
+
   String get endpoint => _endpoint;
   String? get username => _username;
-  
+
+  String get modelLabel => selectedModel?.shortName ?? 'Auto model';
+  String get modelSubLabel {
+    final m = selectedModel;
+    if (m == null) return 'Default';
+    final v = selectedVariant;
+    return v == null || v.isEmpty ? m.providerID : '${m.providerID} · $v';
+  }
+
+  void setSection(AppSection value) {
+    if (section == value) return;
+    section = value;
+    notifyListeners();
+  }
+
   SessionInfo? get current => (activeIndex >= 0 && activeIndex < sessions.length) ? sessions[activeIndex] : null;
 
   void clearError() {
@@ -73,6 +96,7 @@ class AppState extends ChangeNotifier {
       infoText = info['data'] is Map ? (info['data']['name']?.toString() ?? 'OpenCode') : (info['name']?.toString() ?? 'OpenCode');
       connected = true;
       connecting = false;
+      await loadModels();
       await refreshSessions();
       _startEvents();
       if (sessions.isEmpty) {
@@ -94,6 +118,60 @@ class AppState extends ChangeNotifier {
       return '${e.message}${e.statusCode != null ? ' (${e.statusCode})' : ''}$body';
     }
     return e.toString();
+  }
+
+  Future<void> loadModels() async {
+    try {
+      final raw = await api.listModels();
+      final parsed = raw.map(ModelOption.fromJson).where((m) => m.id.isNotEmpty).toList();
+      if (parsed.isNotEmpty) models = parsed;
+      modelsLoaded = true;
+      if (selectedModel == null) {
+        try {
+          final def = await api.getDefaultModel();
+          if (def != null) {
+            final id = (def['id'] ?? def['modelID'] ?? '').toString();
+            final provider = (def['providerID'] ?? 'opencode').toString();
+            final found = models.where((m) => m.id == id && m.providerID == provider);
+            if (found.isNotEmpty) selectedModel = found.first;
+          }
+        } catch (_) {
+          // Default model lookup is optional.
+        }
+      }
+      selectedModel ??= models.first;
+      final variants = selectedModel!.variants;
+      if (variants.isNotEmpty && (selectedVariant == null || !variants.contains(selectedVariant))) {
+        selectedVariant = variants.first;
+      }
+    } catch (_) {
+      models = List.of(ModelOption.fallback);
+      selectedModel ??= models.first;
+      modelsLoaded = false;
+    }
+    notifyListeners();
+  }
+
+  Future<void> selectModel(ModelOption model, {String? variant}) async {
+    selectedModel = model;
+    final variants = model.variants;
+    selectedVariant = (variant != null && variants.contains(variant))
+        ? variant
+        : (variants.isEmpty ? null : variants.first);
+    notifyListeners();
+    final s = current;
+    if (s == null) return;
+    try {
+      await api.setSessionModel(
+        s.id,
+        modelID: model.id,
+        providerID: model.providerID,
+        variant: selectedVariant,
+      );
+    } catch (e) {
+      error = _err(e);
+    }
+    notifyListeners();
   }
 
   Future<void> refreshSessions() async {
@@ -140,6 +218,19 @@ class AppState extends ChangeNotifier {
       s.loaded = true;
       error = null;
       notifyListeners();
+      final m = selectedModel;
+      if (m != null) {
+        try {
+          await api.setSessionModel(
+            s.id,
+            modelID: m.id,
+            providerID: m.providerID,
+            variant: selectedVariant,
+          );
+        } catch (_) {
+          // Model switch is best-effort for a brand-new session.
+        }
+      }
     } catch (e) {
       error = _err(e);
       notifyListeners();

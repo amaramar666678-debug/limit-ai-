@@ -4,6 +4,6 @@ import 'package:limit_ai/main.dart';
 void main() {
   testWidgets('App builds', (WidgetTester tester) async {
     await tester.pumpWidget(const LimitAIApp());
-    expect(find.text('Limit AI'), findsWidgets);
+    expect(find.text('multi mause'), findsWidgets);
   });
 }

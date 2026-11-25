@@ -33,7 +33,7 @@ class _LimitAIAppState extends State<LimitAIApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Limit AI',
+      title: 'multi mause',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       home: AppShell(state: state),

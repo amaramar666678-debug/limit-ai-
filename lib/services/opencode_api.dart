@@ -96,6 +96,36 @@ class OpenCodeApi {
 
   Future<Map<String, dynamic>> info() => getJson('/api/info');
 
+  Future<List<Map<String, dynamic>>> listModels() async {
+    final res = await getJson('/api/model');
+    final data = res['data'];
+    if (data is List) return data.whereType<Map<String, dynamic>>().toList();
+    final items = res['models'] ?? res['items'];
+    if (items is List) return items.whereType<Map<String, dynamic>>().toList();
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> getDefaultModel() async {
+    final res = await getJson('/api/model/default');
+    final data = res['data'];
+    if (data is Map<String, dynamic>) return data;
+    return null;
+  }
+
+  Future<void> setSessionModel(
+    String sessionId, {
+    required String modelID,
+    required String providerID,
+    String? variant,
+  }) async {
+    final model = <String, dynamic>{
+      'id': modelID,
+      'providerID': providerID,
+    };
+    if (variant != null && variant.isNotEmpty) model['variant'] = variant;
+    await postJson('/api/session/$sessionId/model', {'model': model});
+  }
+
   Future<List<Map<String, dynamic>>> listSessions({int limit = 50}) async {
     final res = await getJson('/api/session', {'limit': '$limit', 'order': 'desc'});
     final data = res['data'];
