@@ -22,6 +22,32 @@ class ToolEntry {
   ToolStatus status;
 }
 
+/// A local file sent to OpenCode as a prompt attachment.
+class ChatAttachment {
+  ChatAttachment(this.path, {String? name, this.size})
+      : name = name ?? _fileName(path);
+
+  final String path;
+  final String name;
+  final int? size;
+
+  static String _fileName(String path) {
+    final parts = path.replaceAll('\\', '/').split('/');
+    return parts.isEmpty ? path : parts.last;
+  }
+
+  bool get isImage {
+    final lower = name.toLowerCase();
+    return ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+        .any((ext) => lower.endsWith(ext));
+  }
+
+  Map<String, dynamic> toJson() => {
+        'uri': Uri.file(path).toString(),
+        'name': name,
+      };
+}
+
 class ChatMessage {
   ChatMessage({
     required this.id,
@@ -29,13 +55,16 @@ class ChatMessage {
     required this.text,
     this.streaming = false,
     List<ToolEntry>? tools,
-  }) : tools = tools ?? [];
+    List<ChatAttachment>? attachments,
+  })  : tools = tools ?? [],
+        attachments = attachments ?? [];
 
   final String id;
   final ChatRole role;
   String text;
   bool streaming;
   final List<ToolEntry> tools;
+  final List<ChatAttachment> attachments;
 }
 
 class SessionInfo {

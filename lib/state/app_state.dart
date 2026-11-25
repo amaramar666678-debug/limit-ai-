@@ -5,17 +5,28 @@ import '../models/chat_models.dart';
 import '../models/model_info.dart';
 import '../services/opencode_api.dart';
 import '../services/opencode_discovery.dart';
+import '../services/settings_store.dart';
 
 enum AppSection { chat, multiMouse }
 
 class AppState extends ChangeNotifier {
-  AppState({String endpoint = '127.0.0.1:4096', this.directory = ''})
-      : _endpoint = endpoint,
+  AppState({
+    String endpoint = '127.0.0.1:4096',
+    this.directory = '',
+    this.settings,
+    this.initialModelId,
+    this.initialProviderId,
+    this.initialVariant,
+  })  : _endpoint = endpoint,
         api = OpenCodeApi(baseUrl: endpoint);
 
   OpenCodeApi api;
   String _endpoint;
   String directory;
+  final SettingsStore? settings;
+  final String? initialModelId;
+  final String? initialProviderId;
+  final String? initialVariant;
   String? _username;
   String? _password;
   bool connecting = false;
@@ -66,6 +77,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _persist() async {
+    final store = settings;
+    if (store == null) return;
+    try {
+      await store.save(
+        endpoint: _endpoint,
+        directory: directory,
+        modelId: selectedModel?.id,
+        providerId: selectedModel?.providerID,
+        variant: selectedVariant,
+      );
+    } catch (_) {
+      // Persistence is best-effort.
+    }
+  }
+
   Future<void> init() async {
     await autoConnect();
   }
@@ -101,6 +128,7 @@ class AppState extends ChangeNotifier {
     connecting = true;
     error = null;
     notifyListeners();
+    await _persist();
     try {
       final info = await api.info();
       infoText = info['data'] is Map ? (info['data']['name']?.toString() ?? 'OpenCode') : (info['name']?.toString() ?? 'OpenCode');
@@ -136,6 +164,18 @@ class AppState extends ChangeNotifier {
       final parsed = raw.map(ModelOption.fromJson).where((m) => m.id.isNotEmpty).toList();
       if (parsed.isNotEmpty) models = parsed;
       modelsLoaded = true;
+      if (selectedModel == null && initialModelId != null) {
+        final restored = models.where(
+          (m) => m.id == initialModelId &&
+              (initialProviderId == null || m.providerID == initialProviderId),
+        );
+        if (restored.isNotEmpty) {
+          selectedModel = restored.first;
+          if (initialVariant != null && restored.first.variants.contains(initialVariant)) {
+            selectedVariant = initialVariant;
+          }
+        }
+      }
       if (selectedModel == null) {
         try {
           final def = await api.getDefaultModel();
@@ -156,6 +196,18 @@ class AppState extends ChangeNotifier {
       }
     } catch (_) {
       models = List.of(ModelOption.fallback);
+      if (selectedModel == null && initialModelId != null) {
+        final restored = models.where(
+          (m) => m.id == initialModelId &&
+              (initialProviderId == null || m.providerID == initialProviderId),
+        );
+        if (restored.isNotEmpty) {
+          selectedModel = restored.first;
+          if (initialVariant != null && restored.first.variants.contains(initialVariant)) {
+            selectedVariant = initialVariant;
+          }
+        }
+      }
       selectedModel ??= models.first;
       modelsLoaded = false;
     }
@@ -169,6 +221,7 @@ class AppState extends ChangeNotifier {
         ? variant
         : (variants.isEmpty ? null : variants.first);
     notifyListeners();
+    _persist();
     final s = current;
     if (s == null) return;
     try {
@@ -428,7 +481,7 @@ class AppState extends ChangeNotifier {
     return ToolKind.other;
   }
 
-  Future<void> send(String text) async {
+  Future<void> send(String text, {List<ChatAttachment> attachments = const []}) async {
     final t = text.trim();
     final s = current;
     if (t.isEmpty || s == null || s.busy) return;
@@ -436,6 +489,7 @@ class AppState extends ChangeNotifier {
       id: 'local_${DateTime.now().microsecondsSinceEpoch}',
       role: ChatRole.user,
       text: t,
+      attachments: List<ChatAttachment>.from(attachments),
     );
     s.messages.add(optimistic);
     s.busy = true;
@@ -445,7 +499,11 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     try {
-      await api.prompt(s.id, t);
+      await api.prompt(
+        s.id,
+        t,
+        files: attachments.map((a) => a.toJson()).toList(),
+      );
       await loadMessages(s);
       error = null;
     } catch (e) {

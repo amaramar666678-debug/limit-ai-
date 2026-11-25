@@ -23,10 +23,13 @@
 
 ### AI chat
 - Fast, dark, fluent interface in English (Arabic available in Settings).
+- Endpoint, project directory, language, and selected model are saved locally between runs.
 - Model picker loaded from `/api/model` with a built-in fallback list and support for variants such as `high` / `max`.
 - Live agent status animation: **Thinking → Writing → Running tool → Waiting**.
 - Delete sessions from the sidebar or the top bar, with confirmation.
-- Tool calls, code blocks, copy button, and interrupt support.
+- Markdown rendering (headings, lists, links, tables) plus code blocks with a copy button.
+- File and image attachments up to 20 MiB each (text, PNG, JPEG, GIF, WebP, PDF, SVG).
+- Tool calls and interrupt support.
 
 ### Multi Mause — the ten-cursor team
 - **10 cursors** that move and click in patterns: row, column, 5×2 grid, circle, and diagonal.
@@ -53,7 +56,7 @@ dart run tool/generate_icon.dart
 flutter build windows
 ```
 
-Output: `build\x64\runner\Release\` — copy the whole `Release` folder (all DLLs are required).
+Output: `build\windows\x64\runner\Release\` — copy the whole `Release` folder (all DLLs are required).
 
 For development:
 
@@ -68,6 +71,7 @@ flutter run -d windows
 - Windows exposes **only one physical cursor**. The ten team actions are therefore executed in rapid sequence with a visual indicator for each cursor, rather than ten independent system cursors.
 - Clicks are real and affect open applications. Use the Stop button or **Esc** at any time.
 - The official logo lives at `assets/logo_multi_mause.webp` and is also used as the Windows app icon.
+- The repository is MIT licensed (see `LICENSE`). GitHub Actions runs `flutter analyze`, `flutter test`, and a Windows release build on every push.
 
 ---
 

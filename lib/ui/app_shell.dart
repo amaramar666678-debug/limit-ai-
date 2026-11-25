@@ -1,6 +1,9 @@
-﻿import 'dart:math' as math;
+﻿import 'dart:io';
+import 'dart:math' as math;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../models/chat_models.dart';
 import '../models/model_info.dart';
 import '../state/app_state.dart';
@@ -508,6 +511,7 @@ class _WorkspaceState extends State<_Workspace> {
   final _input = TextEditingController();
   final _focus = FocusNode();
   final _scroll = ScrollController();
+  final List<ChatAttachment> _attachments = [];
   String? _lastSession;
   int _lastMsgCount = 0;
   bool _lastBusy = false;
@@ -522,9 +526,56 @@ class _WorkspaceState extends State<_Workspace> {
 
   void _submit(String t) {
     if (t.trim().isEmpty) return;
-    widget.state.send(t);
+    final files = List<ChatAttachment>.from(_attachments);
+    widget.state.send(t, attachments: files);
     _input.clear();
+    _attachments.clear();
     _focus.requestFocus();
+    setState(() {});
+  }
+
+  Future<void> _pickFiles() async {
+    final pickedFiles = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const [
+        'txt', 'md', 'json', 'yaml', 'yml', 'dart', 'py', 'js', 'jsx',
+        'ts', 'tsx', 'html', 'htm', 'css', 'csv', 'xml', 'log',
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'svg',
+      ],
+    );
+    if (pickedFiles.isEmpty || !mounted) return;
+    const maxBytes = 20 * 1024 * 1024;
+    final errors = <String>[];
+    for (final picked in pickedFiles) {
+      final path = picked.path;
+      if (path == null || path.isEmpty) {
+        errors.add('${picked.name}: no local path');
+        continue;
+      }
+      final file = File(path);
+      if (!file.existsSync()) {
+        errors.add('${picked.name}: file not found');
+        continue;
+      }
+      final size = file.lengthSync();
+      if (size > maxBytes) {
+        errors.add('${picked.name}: larger than 20 MiB');
+        continue;
+      }
+      if (_attachments.any((a) => a.path == path)) continue;
+      setState(() {
+        _attachments.add(ChatAttachment(path, name: picked.name, size: size));
+      });
+    }
+    if (errors.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Skipped: ${errors.join(', ')}')),
+      );
+    }
+  }
+
+  void _removeAttachment(ChatAttachment attachment) {
+    setState(() => _attachments.removeWhere((a) => a.path == attachment.path));
   }
 
   void _scrollToEnd() {
@@ -557,6 +608,9 @@ class _WorkspaceState extends State<_Workspace> {
           focus: _focus,
           enabled: st.connected && s != null,
           running: s?.busy ?? false,
+          attachments: _attachments,
+          onPickFiles: _pickFiles,
+          onRemoveAttachment: _removeAttachment,
           onSubmit: _submit,
           onStop: st.interruptCurrent,
         ),
@@ -1067,9 +1121,51 @@ class _UserBlock extends StatelessWidget {
                 bottomRight: Radius.circular(4),
               ),
             ),
-            child: Directionality(
-              textDirection: dirOf(m.text),
-              child: SelectableText(m.text, style: const TextStyle(fontSize: 14.5, height: 1.5)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Directionality(
+                  textDirection: dirOf(m.text),
+                  child: SelectableText(m.text, style: const TextStyle(fontSize: 14.5, height: 1.5)),
+                ),
+                if (m.attachments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final a in m.attachments)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Palette.raised,
+                            border: Border.all(color: Palette.line),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                a.isImage ? Icons.image_rounded : Icons.description_rounded,
+                                size: 13,
+                                color: Palette.accent,
+                              ),
+                              const SizedBox(width: 5),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 220),
+                                child: Text(
+                                  a.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 11.5, color: Palette.muted),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -1120,20 +1216,21 @@ class _RichMessage extends StatelessWidget {
   const _RichMessage({required this.text, required this.streaming});
   final String text;
   final bool streaming;
-  static const _base = TextStyle(fontSize: 14.5, height: 1.65);
+  static const _base = TextStyle(fontSize: 14.5, height: 1.65, color: Palette.text);
 
-  List<InlineSpan> _inline(String t) {
-    final p = t.split('`');
-    return [
-      for (var i = 0; i < p.length; i++)
-        if (p[i].isNotEmpty)
-          TextSpan(
-            text: p[i],
-            style: i.isOdd
-                ? monoStyle(size: 13, color: Palette.accent).copyWith(backgroundColor: Palette.raised)
-                : null,
-          ),
-    ];
+  MarkdownStyleSheet _style(BuildContext context) {
+    final base = MarkdownStyleSheet.fromTheme(Theme.of(context));
+    return base.copyWith(
+      p: _base,
+      code: monoStyle(size: 13, color: Palette.accent),
+      h1: _base.copyWith(fontSize: 20, fontWeight: FontWeight.w700),
+      h2: _base.copyWith(fontSize: 17, fontWeight: FontWeight.w700),
+      h3: _base.copyWith(fontSize: 15.5, fontWeight: FontWeight.w700),
+      blockquote: _base.copyWith(color: Palette.muted, fontStyle: FontStyle.italic),
+      tableHead: _base.copyWith(fontWeight: FontWeight.w700),
+      tableBody: _base,
+      a: _base.copyWith(color: Palette.accent, decoration: TextDecoration.underline),
+    );
   }
 
   @override
@@ -1147,15 +1244,26 @@ class _RichMessage extends StatelessWidget {
         final nl = code.indexOf('\n');
         if (nl != -1 && nl < 20) code = code.substring(nl + 1);
         children.add(_CodeBlock(code.trimRight()));
-      } else if (parts[i].trim().isNotEmpty || (isLast && streaming)) {
-        final spans = _inline(parts[i].trim());
-        if (isLast && streaming) {
-          spans.add(const TextSpan(text: ' ▍', style: TextStyle(color: Palette.accent)));
-        }
+      } else {
+        var markdown = parts[i].trim();
+        if (isLast && streaming) markdown = '$markdown ▍';
+        if (markdown.trim().isEmpty) continue;
         children.add(
           Directionality(
-            textDirection: dirOf(parts[i]),
-            child: SelectableText.rich(TextSpan(style: _base, children: spans)),
+            textDirection: dirOf(markdown),
+            child: MarkdownBody(
+              data: markdown,
+              shrinkWrap: true,
+              selectable: true,
+              styleSheet: _style(context),
+              onTapLink: (_, href, _) {
+                if (href == null) return;
+                Clipboard.setData(ClipboardData(text: href));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Link copied: $href')),
+                );
+              },
+            ),
           ),
         );
       }
@@ -1294,6 +1402,9 @@ class _Composer extends StatelessWidget {
     required this.focus,
     required this.enabled,
     required this.running,
+    required this.attachments,
+    required this.onPickFiles,
+    required this.onRemoveAttachment,
     required this.onSubmit,
     required this.onStop,
   });
@@ -1302,6 +1413,9 @@ class _Composer extends StatelessWidget {
   final FocusNode focus;
   final bool enabled;
   final bool running;
+  final List<ChatAttachment> attachments;
+  final VoidCallback onPickFiles;
+  final void Function(ChatAttachment) onRemoveAttachment;
   final void Function(String) onSubmit;
   final VoidCallback onStop;
 
@@ -1355,9 +1469,36 @@ class _Composer extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (attachments.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final a in attachments)
+                              _AttachmentChip(
+                                attachment: a,
+                                onRemove: () => onRemoveAttachment(a),
+                              ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
+                        Tooltip(
+                          message: 'Attach files (max 20 MiB each)',
+                          child: IconButton(
+                            onPressed: enabled && !running ? onPickFiles : null,
+                            icon: const Icon(Icons.attach_file_rounded),
+                            color: Palette.muted,
+                            iconSize: 19,
+                            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         const Expanded(
                           child: Text(
                             'Enter sends. Shift+Enter adds a line.',
@@ -1383,6 +1524,68 @@ class _Composer extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      );
+}
+
+String _formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) {
+    final kb = (bytes / 1024).toStringAsFixed(0);
+    return '$kb KB';
+  }
+  final mb = (bytes / (1024 * 1024)).toStringAsFixed(1);
+  return '$mb MB';
+}
+
+class _AttachmentChip extends StatelessWidget {
+  const _AttachmentChip({required this.attachment, required this.onRemove});
+
+  final ChatAttachment attachment;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(9, 4, 2, 4),
+        decoration: BoxDecoration(
+          color: Palette.raised,
+          border: Border.all(color: Palette.line),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              attachment.isImage ? Icons.image_rounded : Icons.description_rounded,
+              size: 15,
+              color: Palette.accent,
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 190),
+              child: Text(
+                attachment.name,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: Palette.text),
+              ),
+            ),
+            if (attachment.size != null) ...[
+              const SizedBox(width: 6),
+              Text(
+                _formatBytes(attachment.size!),
+                style: const TextStyle(fontSize: 11, color: Palette.muted),
+              ),
+            ],
+            IconButton(
+              tooltip: 'Remove',
+              onPressed: onRemove,
+              icon: const Icon(Icons.close_rounded),
+              color: Palette.muted,
+              iconSize: 14,
+              constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+              padding: EdgeInsets.zero,
+            ),
+          ],
         ),
       );
 }

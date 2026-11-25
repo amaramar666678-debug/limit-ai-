@@ -167,9 +167,14 @@ class OpenCodeApi {
     return [];
   }
 
-  Future<Map<String, dynamic>> prompt(String sessionId, String text) async {
+  Future<Map<String, dynamic>> prompt(
+    String sessionId,
+    String text, {
+    List<Map<String, dynamic>> files = const [],
+  }) async {
     final res = await postJson('/api/session/$sessionId/prompt', {
       'text': text,
+      if (files.isNotEmpty) 'files': files,
     });
     final data = res?['data'];
     if (data is Map<String, dynamic>) return data;
