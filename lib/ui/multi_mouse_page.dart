@@ -31,6 +31,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
   String? _error;
 
   final _taskCtrl = TextEditingController();
+  final _taskFocus = FocusNode();
   final _xCtrl = TextEditingController();
   final _yCtrl = TextEditingController();
   String? _taskLabel;
@@ -54,12 +55,16 @@ class _MultiMousePageState extends State<MultiMousePage> {
     } catch (e) {
       _error = e.toString();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _taskFocus.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _controller?.cancel();
     _taskCtrl.dispose();
+    _taskFocus.dispose();
     _xCtrl.dispose();
     _yCtrl.dispose();
     super.dispose();
@@ -353,33 +358,50 @@ class _MultiMousePageState extends State<MultiMousePage> {
             style: const TextStyle(fontSize: 12.5, color: Palette.muted, height: 1.5),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _taskCtrl,
-            enabled: !_running,
-            minLines: 1,
-            maxLines: 3,
-            cursorColor: Palette.accent,
-            style: const TextStyle(fontSize: 13.5),
-            decoration: InputDecoration(
-              hintText: AppStrings.aiTaskHint,
-              hintStyle: const TextStyle(color: Palette.muted),
-              filled: true,
-              fillColor: Palette.bg,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Palette.line),
+          Focus(
+            onKeyEvent: (_, event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.enter &&
+                  !HardwareKeyboard.instance.isShiftPressed) {
+                _runTeamTask();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: TextField(
+              controller: _taskCtrl,
+              focusNode: _taskFocus,
+              enabled: !_running,
+              minLines: 1,
+              maxLines: 3,
+              cursorColor: Palette.accent,
+              style: const TextStyle(fontSize: 13.5),
+              decoration: InputDecoration(
+                hintText: AppStrings.aiTaskHint,
+                hintStyle: const TextStyle(color: Palette.muted),
+                filled: true,
+                fillColor: Palette.bg,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Palette.line),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Palette.line),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Palette.accent),
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Palette.line),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Palette.accent),
-              ),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            AppStrings.pressEnterToStart,
+            style: const TextStyle(fontSize: 11.5, color: Palette.muted),
           ),
           if (_taskLabel != null) ...[
             const SizedBox(height: 10),

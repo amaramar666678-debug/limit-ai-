@@ -19,11 +19,24 @@ class OpenCodeEvent {
 }
 
 class OpenCodeApi {
-  OpenCodeApi({required String baseUrl, this.username, this.password}) : baseUrl = _normalize(baseUrl);
+  OpenCodeApi({
+    required String baseUrl,
+    this.username,
+    this.password,
+    this.timeout = const Duration(seconds: 10),
+    this.eventIdleTimeout = const Duration(seconds: 45),
+  }) : baseUrl = _normalize(baseUrl);
 
   String baseUrl;
   String? username;
   String? password;
+
+  /// Timeout for one-shot HTTP requests.
+  final Duration timeout;
+
+  /// Reconnect the SSE stream if no data arrives for this long.
+  final Duration eventIdleTimeout;
+
   final http.Client _client = http.Client();
 
   static String _normalize(String input) {
@@ -54,6 +67,16 @@ class OpenCodeApi {
     return h;
   }
 
+  Future<T> _timed<T>(Future<T> request, String label) async {
+    try {
+      return await request.timeout(timeout);
+    } on TimeoutException {
+      throw OpenCodeApiException(
+        '$label timed out after ${timeout.inSeconds}s',
+      );
+    }
+  }
+
   dynamic _decode(http.Response r) {
     if (r.statusCode < 200 || r.statusCode >= 300) {
       throw OpenCodeApiException(
@@ -67,14 +90,17 @@ class OpenCodeApi {
   }
 
   Future<Map<String, dynamic>> getJson(String path, [Map<String, String>? query]) async {
-    final r = await _client.get(_uri(path, query), headers: _headers);
+    final r = await _timed(_client.get(_uri(path, query), headers: _headers), 'GET $path');
     final data = _decode(r);
     if (data is Map<String, dynamic>) return data;
     throw OpenCodeApiException('Unexpected response', body: r.body);
   }
 
   Future<Map<String, dynamic>?> postJson(String path, [Object? body]) async {
-    final r = await _client.post(_uri(path), headers: _headers, body: jsonEncode(body ?? {}));
+    final r = await _timed(
+      _client.post(_uri(path), headers: _headers, body: jsonEncode(body ?? {})),
+      'POST $path',
+    );
     final data = _decode(r);
     if (data == null) return null;
     if (data is Map<String, dynamic>) return data;
@@ -82,7 +108,10 @@ class OpenCodeApi {
   }
 
   Future<Map<String, dynamic>?> patchJson(String path, [Object? body]) async {
-    final r = await _client.patch(_uri(path), headers: _headers, body: jsonEncode(body ?? {}));
+    final r = await _timed(
+      _client.patch(_uri(path), headers: _headers, body: jsonEncode(body ?? {})),
+      'PATCH $path',
+    );
     final data = _decode(r);
     if (data == null) return null;
     if (data is Map<String, dynamic>) return data;
@@ -90,7 +119,7 @@ class OpenCodeApi {
   }
 
   Future<void> delete(String path) async {
-    final r = await _client.delete(_uri(path), headers: _headers);
+    final r = await _timed(_client.delete(_uri(path), headers: _headers), 'DELETE $path');
     _decode(r);
   }
 
@@ -190,13 +219,21 @@ class OpenCodeApi {
     req.headers.addAll(_headers);
     req.headers['Accept'] = 'text/event-stream';
     req.headers['Cache-Control'] = 'no-cache';
-    final res = await _client.send(req);
+    final res = await _timed(_client.send(req), 'Event stream connect');
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw OpenCodeApiException('Event stream failed', statusCode: res.statusCode);
     }
     String? eventName;
     final dataLines = <String>[];
-    await for (final line in res.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+    final lines = res.stream.timeout(
+      eventIdleTimeout,
+      onTimeout: (sink) => sink.addError(
+        OpenCodeApiException(
+          'Event stream idle for ${eventIdleTimeout.inSeconds}s',
+        ),
+      ),
+    );
+    await for (final line in lines.transform(utf8.decoder).transform(const LineSplitter())) {
       if (line.isEmpty) {
         if (dataLines.isNotEmpty) {
           final rawData = dataLines.join('\n');

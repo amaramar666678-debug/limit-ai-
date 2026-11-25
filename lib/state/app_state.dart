@@ -109,6 +109,21 @@ class AppState extends ChangeNotifier {
   }
 
   Timer? _retryTimer;
+  Timer? _eventRetryTimer;
+  int _eventRetries = 0;
+  bool _disposed = false;
+
+  void _scheduleEventReconnect() {
+    if (_disposed || connecting || _eventRetryTimer?.isActive == true) return;
+    final seconds = math.min(30, 1 << _eventRetries);
+    _eventRetries++;
+    _eventRetryTimer = Timer(Duration(seconds: seconds), () {
+      _eventRetryTimer = null;
+      if (_disposed || connected) return;
+      _startEvents();
+    });
+  }
+
   void _scheduleAutoRetry() {
     _retryTimer?.cancel();
     _retryTimer = Timer(const Duration(seconds: 5), () {
@@ -127,6 +142,12 @@ class AppState extends ChangeNotifier {
     api = OpenCodeApi(baseUrl: _endpoint, username: _username, password: _password);
     connecting = true;
     error = null;
+    _eventRetryTimer?.cancel();
+    _eventRetryTimer = null;
+    _eventRetries = 0;
+    await _eventSub?.cancel();
+    _eventSub = null;
+    _eventsRunning = false;
     notifyListeners();
     await _persist();
     try {
@@ -527,22 +548,28 @@ class AppState extends ChangeNotifier {
 
   void _startEvents() {
     if (_eventsRunning) return;
+    _eventRetryTimer?.cancel();
+    _eventRetryTimer = null;
     _eventsRunning = true;
     _eventSub?.cancel();
     _eventSub = api.subscribeEvents().listen((evt) {
+      _eventRetries = 0;
+      if (!connected) {
+        connected = true;
+        error = null;
+      }
       _handleEvent(evt);
     }, onError: (e) {
       _eventsRunning = false;
       connected = false;
       error = _err(e is Object ? e : Exception('Event stream error'));
       notifyListeners();
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!_eventsRunning) connect();
-      });
+      _scheduleEventReconnect();
     }, onDone: () {
       _eventsRunning = false;
       connected = false;
       notifyListeners();
+      _scheduleEventReconnect();
     });
   }
 
@@ -615,7 +642,9 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _retryTimer?.cancel();
+    _eventRetryTimer?.cancel();
     _eventSub?.cancel();
     api.dispose();
     super.dispose();

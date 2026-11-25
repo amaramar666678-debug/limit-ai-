@@ -104,8 +104,12 @@ class AppStrings {
         'اكتب المهمة للوكيل — مثلاً: «افتح كروم وابحث عن صور قطط» — فيرسلها إلى الوكيل ويبدأ الفريق بتنفيذها على سطح المكتب.',
       );
   static String get aiTaskHint => t(
-        'e.g. open Chrome and search for cat images',
-        'مثال: افتح كروم وابحث عن صور قطط',
+        'Type a command, e.g. open Chrome and search for cat images',
+        'اكتب أمراً، مثلاً: افتح كروم وابحث عن صور قطط',
+      );
+  static String get pressEnterToStart => t(
+        'The team starts when you press Enter (Shift+Enter adds a line).',
+        'يبدأ الفريق عند الضغط على Enter (وShift+Enter لإضافة سطر).',
       );
   static String cursorProgress(int i) => t('Cursor ${i + 1}/10', 'المؤشر ${i + 1}/10');
   static String get teamWorking => t('Team working...', 'الفريق يعمل...');
