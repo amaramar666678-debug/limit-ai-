@@ -1,17 +1,73 @@
-# limit_ai
+# multi mause
 
-A new Flutter project.
+**مساحة عمل ذكية بلغة عربية وسلسة للتحكم بـ OpenCode + فريق من 10 مؤشرات فأرة يعمل معاً.**
 
-## Getting Started
+`multi mause` هو عميل Flutter خفيف وسريع لـ [OpenCode](https://opencode.ai/) يجمع بين محادثة وكيل ذكي، اختيار النماذج، وقسم **Multi Mause** الذي ينفّذ نقرات فأرة حقيقية في عشرة مواضع بسرعة فائقة. يعمل على **Windows**.
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## 📥 التحميل والتشغيل (أسهل طريقة)
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+1. افتح صفحة [Releases](https://github.com/amaramar666678-debug/limit-ai-/releases/latest).
+2. نزّل ملف `multi-mause-windows-x64.zip`.
+3. فكّ الضغط وافتح `limit_ai.exe`.
+4. من الإعدادات (⚙️) اضبط:
+   - **OpenCode endpoint** (أو اضغط *Auto-detect*).
+   - **Project directory** = مجلد مشروعك الذي سيعمل عليه الوكيل.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+> تحتاج إلى تشغيل خادم OpenCode (`opencode serve` أو تطبيق سطح المكتب) لاستخدام المحادثة واختيار النماذج. قسم Multi Mause يعمل حتى بدونه.
+
+---
+
+## ✨المزايا
+
+### المحادثة
+- واجهة AI عربية/إنجليزية، داكنة، خفيفة وسلسة مع انتقالات متحركة.
+- اختيار النموذج تلقائياً من `/api/model` مع قائمة احتياطية، ودعم variants مثل `high / max`.
+- أنيميشن حالة الوكيل: **Thinking → Writing → Running tool → Waiting**.
+- حذف الجلسة من الشريط الجانبي أو الشريط العلوي مع تأكيد.
+- عرض أدوات الوكيل، أكواد النتائج، نسخ الكود، وإيقاف التنفيذ.
+
+### Multi Mause (الفريق العشرة)
+- **10 مؤشرات** تتحرك وتنقر فعلياً بأنماط: أفقي، عمودي، شبكة 5×2، دائرة، قطري.
+- **تحكم جماعي بالوكيل**: اكتب مثلاً `افتح كروم وابحث عن صور قطط` فيُرسل للوكيل ويبدأ الفريق بفتح المتصفح والبحث وتصفح النتائج.
+- أتمتة لوحة المفاتيح الحقيقية (Win+R، لصق، Enter) لفتح Chrome والبحث عن صور أو معلومات.
+- **تحكم دقيق** بإدخال إحداثيات `X / Y` ونقل/نقر عندها.
+- تحكم بالمسافة والفاصل الزمني ونقر مزدوج، عدّاد 3 ثوانٍ، معاينة مرئية، وإيقاف فوري بـ **Esc**.
+
+---
+
+## 🛠️ البناء من المصدر
+
+يتطلب **Flutter 3.44+** و **Windows 10/11**:
+
+```powershell
+git clone https://github.com/amaramar666678-debug/limit-ai-.git
+cd limit-ai-
+flutter pub get
+dart run tool/generate_icon.dart
+flutter build windows
+```
+
+النتيجة: `build\x64\runner\Release\` — انسخ مجلد `Release` بالكامل (كل الـ DLLs مطلوبة).
+
+للتشغيل أثناء التطوير:
+
+```powershell
+flutter run -d windows
+```
+
+---
+
+## ℹ️ ملاحظات مهمة
+
+- Windows يوفّر **مؤشراً فعلياً واحداً فقط**؛ لذلك تُنفّذ إجراءات المؤشرات العشرة بسرعة متتالية مع عرض بصري لكل مؤشر على حدة، وليست عشرة مؤشرات مستقلة على مستوى النظام.
+- النقرات حقيقية وتؤثر على التطبيقات المفتوحة؛ استخدم زر الإيقاف أو Esc فوراً عند الحاجة.
+- الشعار الرسمي موجود في `assets/logo_multi_mause.webp`، ويُستخدم أيضاً كأيقونة للتطبيق.
+
+---
+
+## 📁 المشروع
+
+- المستودع: https://github.com/amaramar666678-debug/limit-ai-
+- المبني بـ Flutter + Dart، ويعتمد على OpenCode HTTP API.
