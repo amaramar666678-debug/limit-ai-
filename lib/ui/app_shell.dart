@@ -45,7 +45,10 @@ class AppShell extends StatelessWidget {
                   ),
                   child: state.section == AppSection.chat
                       ? _Workspace(key: const ValueKey('chat'), state: state)
-                      : const MultiMousePage(key: ValueKey('multi')),
+                      : MultiMousePage(
+                          key: const ValueKey('multi'),
+                          onAgentTask: (text) => state.send(text),
+                        ),
                 ),
               ),
             ],
@@ -152,6 +155,7 @@ class _Sidebar extends StatelessWidget {
                         info: state.sessions[i],
                         selected: i == state.activeIndex,
                         onTap: () => state.selectSession(i),
+                        onDelete: () => state.deleteSession(i),
                       ),
                     ),
             ),
@@ -353,48 +357,111 @@ class _StatusRow extends StatelessWidget {
   }
 }
 
-class _SessionTile extends StatelessWidget {
-  const _SessionTile({required this.info, required this.selected, required this.onTap});
+class _SessionTile extends StatefulWidget {
+  const _SessionTile({
+    required this.info,
+    required this.selected,
+    required this.onTap,
+    required this.onDelete,
+  });
   final SessionInfo info;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 3),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          child: InkWell(
+  State<_SessionTile> createState() => _SessionTileState();
+}
+
+class _SessionTileState extends State<_SessionTile> {
+  bool _hover = false;
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Palette.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Palette.line),
+        ),
+        title: const Text('حذف المحادثة؟'),
+        content: Text(
+          'سيتم حذف «${widget.info.title}» من OpenCode. لا يمكن التراجع.',
+          style: const TextStyle(fontSize: 13, color: Palette.muted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Palette.danger, foregroundColor: Palette.bg),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) widget.onDelete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final info = widget.info;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 40,
+          decoration: BoxDecoration(
+            color: widget.selected ? Palette.raised : (_hover ? const Color(0x151C2833) : null),
             borderRadius: BorderRadius.circular(8),
-            onTap: onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: selected ? Palette.raised : null,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(width: 16, child: info.busy ? const _Pulse() : null),
-                  Expanded(
-                    child: Text(
-                      info.title,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        color: selected ? Palette.text : Palette.muted,
+          ),
+          child: Row(
+            children: [
+              SizedBox(width: 14, child: info.busy ? const _Pulse() : null),
+              Expanded(
+                child: InkWell(
+                  onTap: widget.onTap,
+                  child: SizedBox(
+                    height: 40,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        info.title,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: widget.selected ? Palette.text : Palette.muted,
+                        ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 120),
+                opacity: _hover || widget.selected ? 1 : 0,
+                child: IconButton(
+                  tooltip: 'حذف المحادثة',
+                  iconSize: 15,
+                  padding: const EdgeInsets.only(right: 4),
+                  color: Palette.danger,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: _confirmDelete,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _Pulse extends StatefulWidget {
@@ -523,7 +590,10 @@ class _WorkspaceState extends State<_Workspace> {
         itemCount: s.messages.length + (s.busy ? 1 : 0),
         itemBuilder: (_, i) {
           if (i >= s.messages.length) {
-            return const Padding(padding: EdgeInsets.only(top: 4), child: _BusyIndicator());
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _BusyIndicator(activity: st.activity),
+            );
           }
           return Padding(padding: const EdgeInsets.only(bottom: 14), child: _MessageBlock(s.messages[i]));
         },
@@ -838,16 +908,86 @@ class _EmptyState extends StatelessWidget {
       );
 }
 
-class _BusyIndicator extends StatelessWidget {
-  const _BusyIndicator();
+class _BusyIndicator extends StatefulWidget {
+  const _BusyIndicator({this.activity});
+  final String? activity;
+
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Palette.accent)),
-          const SizedBox(width: 10),
-          Text('Agent is working...', style: TextStyle(fontSize: 13, color: Palette.muted)),
-        ],
-      );
+  State<_BusyIndicator> createState() => _BusyIndicatorState();
+}
+
+class _BusyIndicatorState extends State<_BusyIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  IconData _icon(String label) {
+    if (label.contains('Thinking')) return Icons.psychology_alt_rounded;
+    if (label.contains('Writing')) return Icons.edit_note_rounded;
+    if (label.contains('tool')) return Icons.build_rounded;
+    return Icons.hourglass_top_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.activity ?? 'Waiting...';
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, _) {
+        final active = (_c.value * 3).floor() % 3;
+        final pulse = 0.82 + 0.18 * math.sin(_c.value * 2 * math.pi);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Palette.raised,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0x4467C7B7)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.scale(
+                scale: pulse,
+                child: Icon(_icon(label), size: 16, color: Palette.accent),
+              ),
+              const SizedBox(width: 9),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+                child: Text(
+                  label,
+                  key: ValueKey(label),
+                  style: const TextStyle(fontSize: 12.5, color: Palette.text),
+                ),
+              ),
+              const SizedBox(width: 8),
+              for (var i = 0; i < 3; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: 3),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Palette.accent.withValues(alpha: i == active ? 1 : 0.3),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _MessageBlock extends StatelessWidget {
@@ -1184,29 +1324,15 @@ class _Composer extends StatelessWidget {
                         ),
                         ListenableBuilder(
                           listenable: controller,
-                          builder: (_, _) {
-                            final canSend = controller.text.trim().isNotEmpty && !running && enabled;
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 140),
-                              child: Material(
-                                color: running ? Palette.raised : (canSend ? Palette.accent : Palette.raised),
-                                borderRadius: BorderRadius.circular(10),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(10),
-                                  onTap: running ? onStop : (canSend ? () => onSubmit(controller.text) : null),
-                                  child: SizedBox(
-                                    width: 34,
-                                    height: 34,
-                                    child: Icon(
-                                      running ? Icons.stop_rounded : Icons.arrow_upward_rounded,
-                                      size: 20,
-                                      color: running ? Palette.danger : (canSend ? Palette.bg : Palette.muted),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                          builder: (_, _) => _SendButton(
+                            canSend: controller.text.trim().isNotEmpty && !running && enabled,
+                            running: running,
+                            onTap: running
+                                ? onStop
+                                : (controller.text.trim().isNotEmpty && enabled
+                                    ? () => onSubmit(controller.text)
+                                    : null),
+                          ),
                         ),
                       ],
                     ),
@@ -1217,6 +1343,98 @@ class _Composer extends StatelessWidget {
           ),
         ),
       );
+}
+
+class _SendButton extends StatefulWidget {
+  const _SendButton({
+    required this.canSend,
+    required this.running,
+    required this.onTap,
+  });
+
+  final bool canSend;
+  final bool running;
+  final VoidCallback? onTap;
+
+  @override
+  State<_SendButton> createState() => _SendButtonState();
+}
+
+class _SendButtonState extends State<_SendButton>
+    with SingleTickerProviderStateMixin {
+  bool _hover = false;
+  late final AnimationController _glow = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _glow.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.canSend || widget.running;
+    final base = widget.running
+        ? Palette.raised
+        : (widget.canSend ? Palette.accent : Palette.raised);
+    final glow = _hover && active;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedBuilder(
+        animation: _glow,
+        builder: (_, _) {
+          final wave = 0.5 + 0.5 * math.sin(_glow.value * 2 * math.pi);
+          return AnimatedScale(
+            scale: glow ? 1.07 : 1.0,
+            duration: const Duration(milliseconds: 140),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              decoration: BoxDecoration(
+                color: glow && widget.canSend
+                    ? Color.lerp(Palette.accent, Colors.white, 0.14)
+                    : base,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: glow
+                    ? [
+                        BoxShadow(
+                          color: (widget.running ? Palette.danger : Palette.accent)
+                              .withValues(alpha: 0.28 + 0.34 * wave),
+                          blurRadius: 13 + 9 * wave,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: widget.onTap,
+                  child: SizedBox(
+                    width: 34,
+                    height: 34,
+                    child: Icon(
+                      widget.running ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+                      size: 20,
+                      color: widget.running
+                          ? Palette.danger
+                          : (widget.canSend ? Palette.bg : Palette.muted),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 Future<void> _showSettings(BuildContext context, AppState state) async {

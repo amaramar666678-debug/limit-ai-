@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../models/chat_models.dart';
 import '../models/model_info.dart';
@@ -31,6 +32,15 @@ class AppState extends ChangeNotifier {
   ModelOption? selectedModel;
   String? selectedVariant;
   bool modelsLoaded = false;
+  String? activity;
+
+  String? get activityLabel => activity;
+
+  void _setActivity(String? value) {
+    if (activity == value) return;
+    activity = value;
+    notifyListeners();
+  }
 
   String get endpoint => _endpoint;
   String? get username => _username;
@@ -244,11 +254,37 @@ class AppState extends ChangeNotifier {
     await loadMessages(sessions[index]);
   }
 
+  Future<void> deleteSession(int index) async {
+    if (index < 0 || index >= sessions.length) return;
+    final target = sessions[index];
+    try {
+      await api.deleteSession(target.id);
+    } catch (e) {
+      error = _err(e);
+      notifyListeners();
+      return;
+    }
+    sessions.removeAt(index);
+    if (activeIndex == index) {
+      activeIndex = sessions.isEmpty ? -1 : math.min(index, sessions.length - 1);
+    } else if (activeIndex > index) {
+      activeIndex--;
+    }
+    final s = current;
+    if (s != null && !s.loaded) {
+      await loadMessages(s);
+    }
+    error = null;
+    notifyListeners();
+  }
+
+  Future<void> deleteCurrent() => deleteSession(activeIndex);
+
   Future<void> loadMessages(SessionInfo s) async {
     try {
       final raw = await api.getMessages(s.id);
       final msgs = <ChatMessage>[];
-      for (final m in raw) {
+      for (final m in _chronological(raw)) {
         final msg = _messageFromJson(m);
         if (msg != null) msgs.add(msg);
       }
@@ -261,6 +297,21 @@ class AppState extends ChangeNotifier {
       error = _err(e);
     }
     notifyListeners();
+  }
+
+  List<Map<String, dynamic>> _chronological(List<Map<String, dynamic>> raw) {
+    if (raw.length < 2) return raw;
+    int? timeOf(Map<String, dynamic> m) {
+      final t = m['time'];
+      if (t is Map) return int.tryParse(t['created']?.toString() ?? '');
+      return int.tryParse((m['created'] ?? '').toString());
+    }
+
+    final first = timeOf(raw.first);
+    final last = timeOf(raw.last);
+    if (first != null && last != null && first < last) return raw;
+    // OpenCode returns newest-first; the chat view needs oldest-first.
+    return raw.reversed.toList();
   }
 
   ChatMessage? _messageFromJson(Map<String, dynamic> m) {
@@ -388,6 +439,7 @@ class AppState extends ChangeNotifier {
     );
     s.messages.add(optimistic);
     s.busy = true;
+    _setActivity('Thinking...');
     if (s.title == 'New session' || s.title == 'Untitled session') {
       s.title = t.length > 40 ? '${t.substring(0, 40)}…' : t;
     }
@@ -399,6 +451,7 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       error = _err(e);
       s.busy = false;
+      _setActivity(null);
     }
     notifyListeners();
   }
@@ -445,20 +498,46 @@ class AppState extends ChangeNotifier {
       refreshSessions();
       return;
     }
-    if (s != null) {
-      if (type.contains('session.execution.started') || type.contains('session.step.started')) {
-        s.busy = true;
-        notifyListeners();
-      }
-      if (type.contains('session.execution.succeeded') || type.contains('session.execution.failed') || type.contains('session.execution.interrupted') || type.contains('session.idle')) {
+
+    final done = type.contains('session.execution.succeeded') ||
+        type.contains('session.execution.failed') ||
+        type.contains('session.execution.interrupted') ||
+        type.contains('session.idle');
+    final isCurrent = s != null && s.id == current?.id;
+
+    if (done) {
+      if (s != null) {
         s.busy = false;
         loadMessages(s);
-        notifyListeners();
-        return;
       }
-      if (type.contains('session.text') || type.contains('session.tool') || type.contains('session.message') || type.contains('session.step')) {
-        loadMessages(s);
+      if (isCurrent) _setActivity(null);
+      notifyListeners();
+      return;
+    }
+
+    if (isCurrent) {
+      if (type.contains('session.reasoning') || type.contains('session.thinking')) {
+        s.busy = true;
+        _setActivity('Thinking...');
+      } else if (type.contains('session.text')) {
+        s.busy = true;
+        _setActivity('Writing...');
+      } else if (type.contains('session.tool')) {
+        s.busy = true;
+        _setActivity('Running tool...');
+      } else if (type.contains('session.execution.started') ||
+          type.contains('session.step.started')) {
+        s.busy = true;
+        _setActivity('Waiting...');
       }
+    }
+
+    if (s != null &&
+        (type.contains('session.text') ||
+            type.contains('session.tool') ||
+            type.contains('session.step') ||
+            type.contains('session.reasoning'))) {
+      loadMessages(s);
     }
   }
 

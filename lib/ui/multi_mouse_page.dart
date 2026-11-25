@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/mouse_controller.dart';
+import '../services/mouse_task.dart';
 import 'logo.dart';
 import 'theme.dart';
 
 class MultiMousePage extends StatefulWidget {
-  const MultiMousePage({super.key});
+  const MultiMousePage({super.key, this.onAgentTask});
+
+  /// Sends the same instruction to the OpenCode agent so it works on the task
+  /// while the ten-cursor team performs the mouse actions.
+  final Future<void> Function(String text)? onAgentTask;
 
   @override
   State<MultiMousePage> createState() => _MultiMousePageState();
@@ -24,13 +29,24 @@ class _MultiMousePageState extends State<MultiMousePage> {
   int _activeIndex = -1;
   String? _error;
 
+  final _taskCtrl = TextEditingController();
+  final _xCtrl = TextEditingController();
+  final _yCtrl = TextEditingController();
+  String? _taskLabel;
+  bool _taskRunning = false;
+
   @override
   void initState() {
     super.initState();
     try {
       _controller = MouseController();
       _controller!.currentPointer().then((p) {
-        if (mounted) setState(() => _origin = p);
+        if (!mounted) return;
+        setState(() {
+          _origin = p;
+          _xCtrl.text = p.dx.round().toString();
+          _yCtrl.text = p.dy.round().toString();
+        });
       }).catchError((Object e) {
         if (mounted) setState(() => _error = e.toString());
       });
@@ -42,6 +58,9 @@ class _MultiMousePageState extends State<MultiMousePage> {
   @override
   void dispose() {
     _controller?.cancel();
+    _taskCtrl.dispose();
+    _xCtrl.dispose();
+    _yCtrl.dispose();
     super.dispose();
   }
 
@@ -50,6 +69,50 @@ class _MultiMousePageState extends State<MultiMousePage> {
     if (c == null) return;
     try {
       final p = await c.currentPointer();
+      if (!mounted) return;
+      setState(() {
+        _origin = p;
+        _xCtrl.text = p.dx.round().toString();
+        _yCtrl.text = p.dy.round().toString();
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Offset? _precisePoint() {
+    final x = int.tryParse(_xCtrl.text.trim());
+    final y = int.tryParse(_yCtrl.text.trim());
+    if (x == null || y == null) {
+      setState(() => _error = 'أدخل إحداثيات X و Y كأرقام صحيحة.');
+      return null;
+    }
+    return Offset(x.toDouble(), y.toDouble());
+  }
+
+  Future<void> _movePrecise() async {
+    final c = _controller;
+    final p = _precisePoint();
+    if (c == null || p == null) return;
+    try {
+      await c.moveTo(p);
+      if (!mounted) return;
+      setState(() {
+        _origin = p;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _clickPrecise() async {
+    final c = _controller;
+    final p = _precisePoint();
+    if (c == null || p == null) return;
+    try {
+      await c.clickAt(p, doubleClick: _doubleClick);
       if (!mounted) return;
       setState(() {
         _origin = p;
@@ -124,6 +187,77 @@ class _MultiMousePageState extends State<MultiMousePage> {
       _running = false;
       _countdown = 0;
       _activeIndex = -1;
+      _taskRunning = false;
+      _taskLabel = null;
+    });
+  }
+
+  Future<void> _runTeamTask() async {
+    final c = _controller;
+    final origin = _origin;
+    final prompt = _taskCtrl.text.trim();
+    if (c == null || origin == null || prompt.isEmpty || _running) return;
+
+    final task = MouseTaskPlanner.fromPrompt(
+      prompt,
+      origin: origin,
+      pattern: _pattern,
+      spacing: _spacing,
+    );
+
+    c.reset();
+    setState(() {
+      _running = true;
+      _taskRunning = true;
+      _error = null;
+      _countdown = 3;
+      _activeIndex = -1;
+      _taskLabel = task.title;
+    });
+
+    for (var n = 3; n >= 1; n--) {
+      if (c.cancelled) break;
+      setState(() => _countdown = n);
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    if (!mounted) return;
+    if (c.cancelled) {
+      _stop();
+      return;
+    }
+
+    setState(() => _countdown = 0);
+
+    // The agent receives the same instruction and starts working in chat.
+    final agentTask = widget.onAgentTask;
+    if (agentTask != null) {
+      agentTask(prompt).catchError((Object e) {
+        if (mounted) setState(() => _error = 'Agent: ${e.toString()}');
+      });
+    }
+
+    final runner = MouseTaskRunner(
+      c,
+      onStep: (_, action) {
+        if (!mounted) return;
+        setState(() {
+          _activeIndex = action.cursor;
+          _taskLabel = action.label;
+        });
+      },
+    );
+
+    try {
+      await runner.run(task);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+    if (!mounted) return;
+    setState(() {
+      _running = false;
+      _taskRunning = false;
+      _activeIndex = -1;
+      _taskLabel = null;
     });
   }
 
@@ -172,6 +306,8 @@ class _MultiMousePageState extends State<MultiMousePage> {
                             _controls(),
                           ],
                         ),
+                      const SizedBox(height: 18),
+                      _aiTeamCard(),
                     ],
                   ),
                 ),
@@ -179,6 +315,140 @@ class _MultiMousePageState extends State<MultiMousePage> {
             );
           }),
         ),
+      ),
+    );
+  }
+
+  Widget _aiTeamCard() {
+    return _panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.smart_toy_outlined, size: 18, color: Palette.accent),
+              const SizedBox(width: 8),
+              const Text(
+                'التحكم الجماعي بالوكيل',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0x3367C7B7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'فريق من 10',
+                  style: TextStyle(fontSize: 10.5, color: Palette.accent, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'اكتب المهمة للوكيل — مثلاً: «افتح كروم وابحث عن صور قطط» — فيرسلها إلى الوكيل ويبدأ الفريق بتنفيذها على سطح المكتب.',
+            style: TextStyle(fontSize: 12.5, color: Palette.muted, height: 1.5),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _taskCtrl,
+            enabled: !_running,
+            minLines: 1,
+            maxLines: 3,
+            cursorColor: Palette.accent,
+            style: const TextStyle(fontSize: 13.5),
+            decoration: InputDecoration(
+              hintText: 'مثال: افتح كروم وابحث عن صور قطط',
+              hintStyle: const TextStyle(color: Palette.muted),
+              filled: true,
+              fillColor: Palette.bg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Palette.line),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Palette.line),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Palette.accent),
+              ),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            ),
+          ),
+          if (_taskLabel != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 13,
+                  height: 13,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Palette.accent),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    _taskLabel!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12.5, color: Palette.accent),
+                  ),
+                ),
+                Text(
+                  _activeIndex >= 0 ? 'المؤشر ${_activeIndex + 1}/10' : '',
+                  style: monoStyle(size: 11, color: Palette.muted),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          ListenableBuilder(
+            listenable: _taskCtrl,
+            builder: (_, _) => Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: (_running || _controller == null || _origin == null || _taskCtrl.text.trim().isEmpty)
+                        ? null
+                        : _runTeamTask,
+                    icon: Icon(
+                      _taskRunning ? Icons.hourglass_top : Icons.smart_toy_rounded,
+                      size: 17,
+                    ),
+                    label: Text(
+                      _running
+                          ? (_countdown > 0 ? 'البدء بعد $_countdown' : 'الفريق يعمل...')
+                          : 'أرسل للوكيل وشغّل الفريق',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Palette.accent,
+                      foregroundColor: Palette.bg,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: _running ? _stop : null,
+                  icon: const Icon(Icons.stop_rounded, size: 16),
+                  label: const Text('إيقاف'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Palette.danger,
+                    side: const BorderSide(color: Palette.line),
+                    padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -329,10 +599,73 @@ class _MultiMousePageState extends State<MultiMousePage> {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.precision_manufacturing_outlined, size: 14, color: Palette.muted),
+              const SizedBox(width: 6),
+              const Text('تحكم دقيق:', style: TextStyle(fontSize: 12, color: Palette.muted)),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 78,
+                child: TextField(
+                  controller: _xCtrl,
+                  enabled: !_running,
+                  keyboardType: TextInputType.number,
+                  style: monoStyle(size: 12),
+                  decoration: _coordDeco('X'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 78,
+                child: TextField(
+                  controller: _yCtrl,
+                  enabled: !_running,
+                  keyboardType: TextInputType.number,
+                  style: monoStyle(size: 12),
+                  decoration: _coordDeco('Y'),
+                ),
+              ),
+              const Spacer(),
+              OutlinedButton(
+                onPressed: _running ? null : _movePrecise,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Palette.line),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('نقل', style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 6),
+              FilledButton(
+                onPressed: _running ? null : _clickPrecise,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Palette.accent,
+                  foregroundColor: Palette.bg,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('نقر', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+
+  InputDecoration _coordDeco(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(fontSize: 11, color: Palette.muted),
+        filled: true,
+        fillColor: Palette.bg,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Palette.line)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Palette.line)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Palette.accent)),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      );
 
   Widget _controls() {
     return _panel(

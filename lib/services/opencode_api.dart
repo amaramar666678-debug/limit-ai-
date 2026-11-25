@@ -149,6 +149,10 @@ class OpenCodeApi {
     throw OpenCodeApiException('Could not create session', body: res?.toString());
   }
 
+  Future<void> deleteSession(String sessionId) async {
+    await delete('/api/session/$sessionId');
+  }
+
   Future<Map<String, dynamic>> getSession(String sessionId) async {
     final res = await getJson('/api/session/$sessionId');
     final data = res['data'];

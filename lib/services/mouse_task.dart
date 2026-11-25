@@ -1,0 +1,199 @@
+import 'package:flutter/material.dart';
+import 'mouse_controller.dart';
+
+enum TeamActionKind { launch, paste, enter, click, doubleClick, move, scroll, delay }
+
+/// One atomic step carried out by a member of the ten-cursor team.
+class TeamAction {
+  const TeamAction(
+    this.kind, {
+    this.text,
+    this.point,
+    this.durationMs,
+    this.cursor = 0,
+    required this.label,
+  });
+
+  final TeamActionKind kind;
+  final String? text;
+  final Offset? point;
+  final int? durationMs;
+  final int cursor;
+  final String label;
+}
+
+class MouseTask {
+  const MouseTask({
+    required this.title,
+    required this.description,
+    required this.actions,
+  });
+
+  final String title;
+  final String description;
+  final List<TeamAction> actions;
+}
+
+/// Turns a natural-language instruction into a concrete, reviewable team plan.
+class MouseTaskPlanner {
+  static final _strip = RegExp(
+    r'افتح|فتح|ابحث|بحث|دور|search|find|open|launch|chrome|كروم|متصفح|browser|'
+    r'صورة|صور|image|images|picture|photos?|عن|about|for|في|من|关于|搜索|打开',
+    caseSensitive: false,
+  );
+
+  static String _query(String prompt) {
+    var q = prompt.replaceAll(_strip, ' ');
+    q = q.replaceAll(RegExp(r'[؟?،,.!]+'), ' ');
+    q = q.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return q.isEmpty ? prompt.trim() : q;
+  }
+
+  static MouseTask fromPrompt(
+    String prompt, {
+    required Offset origin,
+    required MousePattern pattern,
+    required double spacing,
+  }) {
+    final lower = prompt.toLowerCase();
+    final wantsImage = lower.contains('صورة') ||
+        lower.contains('صور') ||
+        lower.contains('image') ||
+        lower.contains('picture') ||
+        lower.contains('photo');
+    final wantsBrowser = lower.contains('كروم') ||
+        lower.contains('chrome') ||
+        lower.contains('متصفح') ||
+        lower.contains('browser') ||
+        wantsImage ||
+        lower.contains('بحث') ||
+        lower.contains('ابحث') ||
+        lower.contains('search') ||
+        lower.contains('info') ||
+        lower.contains('معلومات');
+
+    if (!wantsBrowser) {
+      return tenClicks(origin: origin, pattern: pattern, spacing: spacing);
+    }
+
+    final q = _query(prompt);
+    final url = wantsImage
+        ? 'https://www.google.com/search?tbm=isch&q=${Uri.encodeComponent(q)}'
+        : 'https://www.google.com/search?q=${Uri.encodeComponent(q)}';
+    final command = 'chrome "$url"';
+
+    final actions = <TeamAction>[
+      TeamAction(
+        TeamActionKind.launch,
+        text: command,
+        cursor: 0,
+        label: 'فتح كروم وتحميل الصفحة',
+      ),
+      const TeamAction(
+        TeamActionKind.delay,
+        durationMs: 2600,
+        cursor: 1,
+        label: 'انتظار جاهزية النتائج',
+      ),
+    ];
+
+    // The ten cursors then sweep the result area as one team.
+    final points = MouseController.positions(
+      origin: origin,
+      pattern: pattern,
+      spacing: spacing,
+    );
+    for (var i = 0; i < points.length; i++) {
+      actions.add(TeamAction(
+        TeamActionKind.click,
+        point: points[i],
+        cursor: i,
+        label: wantsImage ? 'فحص الصورة ${i + 1}' : 'فحص النتيجة ${i + 1}',
+      ));
+    }
+
+    return MouseTask(
+      title: wantsImage ? 'بحث جماعي عن صور' : 'بحث جماعي عن معلومات',
+      description: wantsImage ? 'صور: $q' : 'معلومات: $q',
+      actions: actions,
+    );
+  }
+
+  static MouseTask tenClicks({
+    required Offset origin,
+    required MousePattern pattern,
+    required double spacing,
+    bool doubleClick = false,
+  }) {
+    final points = MouseController.positions(
+      origin: origin,
+      pattern: pattern,
+      spacing: spacing,
+    );
+    return MouseTask(
+      title: 'تنفيذ جماعي بـ 10 مؤشرات',
+      description: 'نقرات ${doubleClick ? 'مزدوجة' : 'عادية'} حقيقية حسب النمط المختار',
+      actions: [
+        for (var i = 0; i < points.length; i++)
+          TeamAction(
+            doubleClick ? TeamActionKind.doubleClick : TeamActionKind.click,
+            point: points[i],
+            cursor: i,
+            label: 'المؤشر ${i + 1}',
+          ),
+      ],
+    );
+  }
+}
+
+/// Executes a [MouseTask] step by step and reports progress to the UI.
+class MouseTaskRunner {
+  MouseTaskRunner(this.controller, {this.onStep});
+
+  final MouseController controller;
+  final void Function(int index, TeamAction action)? onStep;
+
+  Future<void> run(MouseTask task) async {
+    controller.reset();
+    for (var i = 0; i < task.actions.length; i++) {
+      if (controller.cancelled) break;
+      final a = task.actions[i];
+      onStep?.call(i, a);
+      switch (a.kind) {
+        case TeamActionKind.launch:
+          await controller.runCommand(a.text ?? '');
+          break;
+        case TeamActionKind.paste:
+          await controller.pasteText(a.text ?? '');
+          break;
+        case TeamActionKind.enter:
+          await controller.pressEnter();
+          break;
+        case TeamActionKind.click:
+          if (a.point != null) await controller.clickAt(a.point!);
+          break;
+        case TeamActionKind.doubleClick:
+          if (a.point != null) {
+            await controller.clickAt(a.point!, doubleClick: true);
+          }
+          break;
+        case TeamActionKind.move:
+          if (a.point != null) await controller.moveTo(a.point!);
+          break;
+        case TeamActionKind.scroll:
+          if (a.point != null) {
+            await controller.scrollAt(a.point!, a.durationMs ?? -120);
+          }
+          break;
+        case TeamActionKind.delay:
+          await Future<void>.delayed(
+            Duration(milliseconds: a.durationMs ?? 100),
+          );
+          break;
+      }
+      if (a.kind != TeamActionKind.delay && !controller.cancelled) {
+        await Future<void>.delayed(const Duration(milliseconds: 24));
+      }
+    }
+  }
+}
