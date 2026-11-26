@@ -1,9 +1,22 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../ui/strings.dart';
+import 'agar_vision.dart';
 import 'mouse_controller.dart';
 
-enum TeamActionKind { launch, paste, enter, click, doubleClick, move, steer, play, scroll, delay }
+enum TeamActionKind {
+  launch,
+  paste,
+  enter,
+  click,
+  doubleClick,
+  move,
+  steer,
+  play,
+  visionPlay,
+  escape,
+  scroll,
+  delay
+}
 
 /// One atomic step carried out by a member of the ten-cursor team.
 class TeamAction {
@@ -142,7 +155,6 @@ class MouseTaskPlanner {
     required double spacing,
   }) {
     final playPoint = Offset(screenCenter.dx, screenCenter.dy + 58);
-    final radius = math.max(90.0, spacing * 2.2);
     return MouseTask(
       title: AppStrings.agarGame,
       description: AppStrings.agarDescription,
@@ -155,14 +167,31 @@ class MouseTaskPlanner {
         ),
         TeamAction(
           TeamActionKind.delay,
-          durationMs: 3800,
+          durationMs: 5000,
           cursor: 1,
           label: AppStrings.waitResults,
         ),
         TeamAction(
+          TeamActionKind.escape,
+          cursor: 2,
+          label: AppStrings.skipAd,
+        ),
+        TeamAction(
+          TeamActionKind.click,
+          point: Offset(screenCenter.dx * 2 - 110, 180),
+          cursor: 3,
+          label: AppStrings.skipAd,
+        ),
+        TeamAction(
+          TeamActionKind.click,
+          point: Offset(screenCenter.dx * 2 - 110, 240),
+          cursor: 4,
+          label: AppStrings.skipAd,
+        ),
+        TeamAction(
           TeamActionKind.click,
           point: playPoint,
-          cursor: 2,
+          cursor: 5,
           label: AppStrings.clickPlay,
         ),
         TeamAction(
@@ -174,28 +203,26 @@ class MouseTaskPlanner {
         TeamAction(
           TeamActionKind.click,
           point: Offset(screenCenter.dx, screenCenter.dy + 96),
-          cursor: 4,
+          cursor: 6,
           label: AppStrings.clickPlay,
         ),
         TeamAction(
           TeamActionKind.delay,
           durationMs: 900,
-          cursor: 5,
+          cursor: 7,
           label: AppStrings.waitResults,
         ),
         TeamAction(
           TeamActionKind.click,
           point: screenCenter,
-          cursor: 6,
+          cursor: 8,
           label: AppStrings.focusGame,
         ),
         TeamAction(
-          TeamActionKind.play,
-          point: screenCenter,
-          radius: radius,
-          durationMs: 20000,
-          cursor: 7,
-          label: AppStrings.playingHuman,
+          TeamActionKind.visionPlay,
+          durationMs: 45000,
+          cursor: 9,
+          label: AppStrings.playingVision,
         ),
       ],
     );
@@ -279,6 +306,12 @@ class MouseTaskRunner {
               durationMs: a.durationMs ?? 15000,
             );
           }
+          break;
+        case TeamActionKind.visionPlay:
+          await AgarVision.play(controller, durationMs: a.durationMs ?? 30000);
+          break;
+        case TeamActionKind.escape:
+          await controller.pressEscape();
           break;
         case TeamActionKind.scroll:
           if (a.point != null) {

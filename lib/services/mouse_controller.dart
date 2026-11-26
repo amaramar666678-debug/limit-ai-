@@ -57,6 +57,7 @@ class MouseController {
   late final int Function(int) _getAsyncKeyState;
 
   static const _vkEscape = 0x1B;
+  static const _vkSpace = 0x20;
   static const _vkWin = 0x5B;
   static const _vkCtrl = 0x11;
   static const _vkR = 0x52;
@@ -240,6 +241,42 @@ class MouseController {
   Future<void> pressEnter() async {
     if (_cancelled) return;
     _tap(_vkEnter);
+  }
+
+  Future<void> pressSpace() async {
+    if (_cancelled) return;
+    _tap(_vkSpace);
+  }
+
+  Future<void> pressEscape() async {
+    if (_cancelled) return;
+    _tap(_vkEscape);
+  }
+
+  Future<void> click() async {
+    if (_cancelled) return;
+    _press(0x0002, 0x0004);
+  }
+
+  /// Smoothly moves the pointer from [from] to [to] in human-like steps.
+  Future<void> glideTo(
+    Offset from,
+    Offset to, {
+    int steps = 10,
+    int minMs = 22,
+    int maxMs = 38,
+  }) async {
+    for (var s = 1; s <= steps && !_cancelled; s++) {
+      final t = s / steps;
+      final eased = t * t * (3 - 2 * t);
+      _setCursorPos(
+        (from.dx + (to.dx - from.dx) * eased).round(),
+        (from.dy + (to.dy - from.dy) * eased).round(),
+      );
+      await Future<void>.delayed(
+        Duration(milliseconds: minMs + (s % 4) * ((maxMs - minMs) ~/ 4)),
+      );
+    }
   }
 
   /// Pastes [text] at the current focus using the clipboard. The previous

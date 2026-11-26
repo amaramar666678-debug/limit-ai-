@@ -129,14 +129,16 @@ class AppStrings {
   // Mouse-driven games
   static String get agarGame => t('Agar.io steer', 'تحكّم بلعبة Agar.io');
   static String get agarDescription => t(
-        'Opens agar.io, starts a round, then plays with human-like mouse moves and occasional clicks. Press Esc to stop.',
-        'يفتح agar.io، يبدأ الجولة، ثم يلعب بحركات ماوس تشبه الإنسان مع نقرات متفرقة. اضغط Esc للإيقاف.',
+        'Opens agar.io, skips ads, then reads the screen to eat smaller cells, flee bigger ones and split with Space. Press Esc to stop.',
+        'يفتح agar.io، يتخطى الإعلانات، ثم يقرأ الشاشة ليأكل الأصغر ويهرب من الأكبر وينقسم بـ Space. اضغط Esc للإيقاف.',
       );
   static String get launchAgar => t('Open agar.io', 'فتح agar.io');
   static String get clickPlay => t('Click Play', 'الضغط على Play');
   static String get focusGame => t('Focus game canvas', 'تفعيل ساحة اللعب');
   static String get steerCell => t('Steering cell - Esc to stop', 'توجيه الخلية - Esc للإيقاف');
   static String get playingHuman => t('Playing like a human - Esc to stop', 'يلعب مثل الإنسان - Esc للإيقاف');
+  static String get playingVision => t('Reading screen: eat small, flee big - Esc to stop', 'يقرأ الشاشة: يأكل الأصغر ويهرب من الأكبر - Esc للإيقاف');
+  static String get skipAd => t('Skipping ad', 'تخطي الإعلان');
 
   // Task status
   static String get taskFinished => t('Task finished', 'انتهت المهمة');
