@@ -35,7 +35,8 @@
 ### Multi Mause — the ten-cursor team
 - **10 cursors** that move and click in patterns: row, column, 5×2 grid, circle, and diagonal.
 - **Agent team control**: the command field is focused as soon as you open Multi Mause; type something like `open Chrome and search for cat images` and press **Enter** to start. The instruction is sent to the agent while the team carries it out on the desktop.
-- Real keyboard automation (Win+R, paste, Enter) to launch Chrome and search for images or information.
+- Real keyboard automation (Win+R, paste, Enter) to launch Chrome and search for images or information, with clipboard settle delays so characters are not scrambled.
+- **Mouse-driven games**: say `play agar.io` and the team opens the game, clicks Play, and continuously steers the cell with the pointer (Esc stops).
 - **Precise control** with manual `X / Y` coordinates plus Move/Click buttons.
 - Adjustable spacing and click interval, double-click mode, 3-second countdown, live preview, and instant stop with **Esc**.
 

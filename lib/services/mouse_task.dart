@@ -1,8 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../ui/strings.dart';
 import 'mouse_controller.dart';
 
-enum TeamActionKind { launch, paste, enter, click, doubleClick, move, scroll, delay }
+enum TeamActionKind { launch, paste, enter, click, doubleClick, move, steer, scroll, delay }
 
 /// One atomic step carried out by a member of the ten-cursor team.
 class TeamAction {
@@ -11,6 +12,7 @@ class TeamAction {
     this.text,
     this.point,
     this.durationMs,
+    this.radius,
     this.cursor = 0,
     required this.label,
   });
@@ -19,6 +21,7 @@ class TeamAction {
   final String? text;
   final Offset? point;
   final int? durationMs;
+  final double? radius;
   final int cursor;
   final String label;
 }
@@ -55,8 +58,20 @@ class MouseTaskPlanner {
     required Offset origin,
     required MousePattern pattern,
     required double spacing,
+    Offset? screenCenter,
   }) {
     final lower = prompt.toLowerCase();
+    final isAgar = lower.contains('agar.io') ||
+        (lower.contains('agar') &&
+            (lower.contains('game') ||
+                lower.contains('لعبة') ||
+                lower.contains('لعب')));
+    if (isAgar) {
+      return agarGame(
+        screenCenter: screenCenter ?? origin,
+        spacing: spacing,
+      );
+    }
     final wantsImage = lower.contains('صورة') ||
         lower.contains('صور') ||
         lower.contains('image') ||
@@ -120,6 +135,72 @@ class MouseTaskPlanner {
     );
   }
 
+  /// Opens agar.io, starts a round, then continuously steers the cell with the
+  /// pointer. Agar.io follows mouse direction; clicks are only needed to start.
+  static MouseTask agarGame({
+    required Offset screenCenter,
+    required double spacing,
+  }) {
+    final playPoint = Offset(screenCenter.dx, screenCenter.dy + 58);
+    final radius = math.max(70.0, spacing * 1.5);
+    return MouseTask(
+      title: AppStrings.agarGame,
+      description: AppStrings.agarDescription,
+      actions: [
+        TeamAction(
+          TeamActionKind.launch,
+          text: 'chrome "https://agar.io"',
+          cursor: 0,
+          label: AppStrings.launchAgar,
+        ),
+        TeamAction(
+          TeamActionKind.delay,
+          durationMs: 3800,
+          cursor: 1,
+          label: AppStrings.waitResults,
+        ),
+        TeamAction(
+          TeamActionKind.click,
+          point: playPoint,
+          cursor: 2,
+          label: AppStrings.clickPlay,
+        ),
+        TeamAction(
+          TeamActionKind.delay,
+          durationMs: 500,
+          cursor: 3,
+          label: AppStrings.waitResults,
+        ),
+        TeamAction(
+          TeamActionKind.click,
+          point: Offset(screenCenter.dx, screenCenter.dy + 96),
+          cursor: 4,
+          label: AppStrings.clickPlay,
+        ),
+        TeamAction(
+          TeamActionKind.delay,
+          durationMs: 900,
+          cursor: 5,
+          label: AppStrings.waitResults,
+        ),
+        TeamAction(
+          TeamActionKind.click,
+          point: screenCenter,
+          cursor: 6,
+          label: AppStrings.focusGame,
+        ),
+        TeamAction(
+          TeamActionKind.steer,
+          point: screenCenter,
+          radius: radius,
+          durationMs: 15000,
+          cursor: 7,
+          label: AppStrings.steerCell,
+        ),
+      ],
+    );
+  }
+
   static MouseTask tenClicks({
     required Offset origin,
     required MousePattern pattern,
@@ -180,6 +261,15 @@ class MouseTaskRunner {
           break;
         case TeamActionKind.move:
           if (a.point != null) await controller.moveTo(a.point!);
+          break;
+        case TeamActionKind.steer:
+          if (a.point != null) {
+            await controller.steer(
+              a.point!,
+              a.radius ?? 90,
+              durationMs: a.durationMs ?? 8000,
+            );
+          }
           break;
         case TeamActionKind.scroll:
           if (a.point != null) {

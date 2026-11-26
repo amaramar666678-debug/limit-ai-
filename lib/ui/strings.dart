@@ -100,8 +100,8 @@ class AppStrings {
   static String get aiTeamControl => t('Agent team control', 'التحكم الجماعي بالوكيل');
   static String get teamOfTen => t('Team of 10', 'فريق من 10');
   static String get aiTeamDescription => t(
-        'Describe a task — e.g. "open Chrome and search for cat images" — and it is sent to the agent while the ten-cursor team carries it out on the desktop.',
-        'اكتب المهمة للوكيل — مثلاً: «افتح كروم وابحث عن صور قطط» — فيرسلها إلى الوكيل ويبدأ الفريق بتنفيذها على سطح المكتب.',
+        'Describe a task — e.g. "open Chrome and search for cat images" or "play agar.io" — and it is sent to the agent while the ten-cursor team carries it out on the desktop.',
+        'اكتب المهمة للوكيل — مثلاً: «افتح كروم وابحث عن صور قطط» أو «العب لعبة agar.io» — فيرسلها إلى الوكيل ويبدأ الفريق بتنفيذها على سطح المكتب.',
       );
   static String get aiTaskHint => t(
         'Type a command, e.g. open Chrome and search for cat images',
@@ -125,6 +125,17 @@ class AppStrings {
   static String imagesLabel(String q) => t('Images: $q', 'صور: $q');
   static String infoLabel(String q) => t('Info: $q', 'معلومات: $q');
   static String get teamClicks => t('Team run with 10 cursors', 'تنفيذ جماعي بـ 10 مؤشرات');
+
+  // Mouse-driven games
+  static String get agarGame => t('Agar.io steer', 'تحكّم بلعبة Agar.io');
+  static String get agarDescription => t(
+        'Opens agar.io, starts a round, then guides the cell with the pointer. Press Esc to stop.',
+        'يفتح agar.io، يبدأ الجولة، ثم يوجّه الخلية بالمؤشر. اضغط Esc للإيقاف.',
+      );
+  static String get launchAgar => t('Open agar.io', 'فتح agar.io');
+  static String get clickPlay => t('Click Play', 'الضغط على Play');
+  static String get focusGame => t('Focus game canvas', 'تفعيل ساحة اللعب');
+  static String get steerCell => t('Steering cell - Esc to stop', 'توجيه الخلية - Esc للإيقاف');
   static String clickDescription(bool doubleClick) => t(
         'Real ${doubleClick ? 'double ' : ''}clicks using the selected pattern',
         'نقرات ${doubleClick ? 'مزدوجة' : 'عادية'} حقيقية حسب النمط المختار',

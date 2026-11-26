@@ -209,6 +209,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
       origin: origin,
       pattern: _pattern,
       spacing: _spacing,
+      screenCenter: c.screenCenter(),
     );
 
     c.reset();

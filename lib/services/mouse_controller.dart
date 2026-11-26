@@ -1,4 +1,4 @@
-import 'dart:ffi';
+import 'dart:ffi' hide Size;
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'package:ffi/ffi.dart';
@@ -36,6 +36,9 @@ class MouseController {
     _keyEvent = lib.lookupFunction<
         Void Function(Uint32, Uint32, Uint32, UintPtr),
         void Function(int, int, int, int)>('keybd_event');
+    _getSystemMetrics = lib.lookupFunction<
+        Int32 Function(Int32),
+        int Function(int)>('GetSystemMetrics');
   }
 
   static final DynamicLibrary _user32 = Platform.isWindows
@@ -46,10 +49,12 @@ class MouseController {
   late final int Function(int, int) _setCursorPos;
   late final void Function(int, int, int, int, int) _mouseEvent;
   late final void Function(int, int, int, int) _keyEvent;
+  late final int Function(int) _getSystemMetrics;
 
   static const _vkWin = 0x5B;
   static const _vkCtrl = 0x11;
   static const _vkR = 0x52;
+  static const _vkA = 0x41;
   static const _vkV = 0x56;
   static const _vkEnter = 0x0D;
   static const _keyUp = 0x0002;
@@ -72,9 +77,41 @@ class MouseController {
     }
   }
 
+  /// Physical screen size in pixels.
+  Size screenSize() => Size(
+        _getSystemMetrics(0).toDouble(),
+        _getSystemMetrics(1).toDouble(),
+      );
+
+  Offset screenCenter() {
+    final s = screenSize();
+    return Offset(s.width / 2, s.height / 2);
+  }
+
   Future<void> moveTo(Offset point) async {
     if (_cancelled) return;
     _setCursorPos(point.dx.round(), point.dy.round());
+  }
+
+  /// Continuously guides a game cursor (e.g. an agar.io cell) in a smooth
+  /// orbit. Games such as agar.io follow the pointer direction without clicks.
+  Future<void> steer(
+    Offset center,
+    double radius, {
+    int durationMs = 8000,
+  }) async {
+    final screen = screenSize();
+    final stopwatch = Stopwatch()..start();
+    var step = 0;
+    while (!_cancelled && stopwatch.elapsedMilliseconds < durationMs) {
+      final angle = step * 0.15;
+      final r = radius * (0.82 + 0.18 * math.sin(step * 0.06));
+      final x = (center.dx + r * math.cos(angle)).clamp(0.0, screen.width).toDouble();
+      final y = (center.dy + r * math.sin(angle)).clamp(0.0, screen.height).toDouble();
+      _setCursorPos(x.round(), y.round());
+      await Future<void>.delayed(const Duration(milliseconds: 26));
+      step++;
+    }
   }
 
   Future<void> clickAt(
@@ -134,13 +171,15 @@ class MouseController {
       previous = null;
     }
     await Clipboard.setData(ClipboardData(text: text));
-    await Future<void>.delayed(const Duration(milliseconds: 40));
+    // Give the clipboard a moment to settle before sending Ctrl+V.
+    await Future<void>.delayed(const Duration(milliseconds: 180));
     if (_cancelled) return;
     _key(_vkCtrl);
     _key(_vkV);
     _key(_vkV, up: true);
     _key(_vkCtrl, up: true);
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    // Do not restore the old clipboard until the paste is fully processed.
+    await Future<void>.delayed(const Duration(milliseconds: 320));
     if (previous?.text != null) {
       try {
         await Clipboard.setData(ClipboardData(text: previous!.text!));
@@ -157,10 +196,16 @@ class MouseController {
     _key(_vkR);
     _key(_vkR, up: true);
     _key(_vkWin, up: true);
-    await Future<void>.delayed(const Duration(milliseconds: 280));
+    await Future<void>.delayed(const Duration(milliseconds: 420));
     if (_cancelled) return;
+    // Clear any previous Run dialog text before pasting the command.
+    _key(_vkCtrl);
+    _key(_vkA);
+    _key(_vkA, up: true);
+    _key(_vkCtrl, up: true);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
     await pasteText(command);
-    await Future<void>.delayed(const Duration(milliseconds: 90));
+    await Future<void>.delayed(const Duration(milliseconds: 260));
     await pressEnter();
   }
 
