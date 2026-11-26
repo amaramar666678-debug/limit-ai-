@@ -136,6 +136,11 @@ class AppStrings {
   static String get clickPlay => t('Click Play', 'الضغط على Play');
   static String get focusGame => t('Focus game canvas', 'تفعيل ساحة اللعب');
   static String get steerCell => t('Steering cell - Esc to stop', 'توجيه الخلية - Esc للإيقاف');
+
+  // Task status
+  static String get taskFinished => t('Task finished', 'انتهت المهمة');
+  static String get taskStopped => t('Task stopped', 'تم إيقاف المهمة');
+  static String get cursorsActive => t('10 cursors active', '10 مؤشرات نشطة');
   static String clickDescription(bool doubleClick) => t(
         'Real ${doubleClick ? 'double ' : ''}clicks using the selected pattern',
         'نقرات ${doubleClick ? 'مزدوجة' : 'عادية'} حقيقية حسب النمط المختار',

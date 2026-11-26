@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi' hide Size;
 import 'dart:io' show Platform;
 import 'dart:math' as math;
@@ -39,6 +40,9 @@ class MouseController {
     _getSystemMetrics = lib.lookupFunction<
         Int32 Function(Int32),
         int Function(int)>('GetSystemMetrics');
+    _getAsyncKeyState = lib.lookupFunction<
+        Int16 Function(Int32),
+        int Function(int)>('GetAsyncKeyState');
   }
 
   static final DynamicLibrary _user32 = Platform.isWindows
@@ -50,7 +54,9 @@ class MouseController {
   late final void Function(int, int, int, int, int) _mouseEvent;
   late final void Function(int, int, int, int) _keyEvent;
   late final int Function(int) _getSystemMetrics;
+  late final int Function(int) _getAsyncKeyState;
 
+  static const _vkEscape = 0x1B;
   static const _vkWin = 0x5B;
   static const _vkCtrl = 0x11;
   static const _vkR = 0x52;
@@ -63,8 +69,30 @@ class MouseController {
   bool _cancelled = false;
   bool get cancelled => _cancelled;
 
+  Timer? _escWatcher;
+  bool _escWasDown = false;
+
   void reset() => _cancelled = false;
   void cancel() => _cancelled = true;
+
+  /// Watches Esc globally, even while Chrome or another window has focus.
+  void startEscWatcher(void Function() onEscape) {
+    _escWatcher?.cancel();
+    _escWasDown = false;
+    _escWatcher = Timer.periodic(const Duration(milliseconds: 40), (_) {
+      final down = (_getAsyncKeyState(_vkEscape) & 0x8000) != 0;
+      if (down && !_escWasDown) onEscape();
+      _escWasDown = down;
+    });
+  }
+
+  void stopEscWatcher() {
+    _escWatcher?.cancel();
+    _escWatcher = null;
+    _escWasDown = false;
+  }
+
+  void dispose() => stopEscWatcher();
 
   Future<Offset> currentPointer() async {
     final p = calloc<_Point>();

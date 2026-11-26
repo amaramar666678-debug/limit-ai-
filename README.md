@@ -38,7 +38,8 @@
 - Real keyboard automation (Win+R, paste, Enter) to launch Chrome and search for images or information, with clipboard settle delays so characters are not scrambled.
 - **Mouse-driven games**: say `play agar.io` and the team opens the game, clicks Play, and continuously steers the cell with the pointer (Esc stops).
 - **Precise control** with manual `X / Y` coordinates plus Move/Click buttons.
-- Adjustable spacing and click interval, double-click mode, 3-second countdown, live preview, and instant stop with **Esc**.
+- Adjustable spacing and click interval, double-click mode, 3-second countdown, live preview, and instant stop with **Esc** (global, works even when Chrome has focus) or the Stop button.
+- The command box is the primary focus: type and press **Enter** or the send icon. A clear **Task finished / Task stopped** status appears when the run ends.
 
 ### Language
 - English is the default language.

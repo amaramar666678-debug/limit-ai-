@@ -36,6 +36,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
   final _yCtrl = TextEditingController();
   String? _taskLabel;
   bool _taskRunning = false;
+  bool _finished = false;
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
   @override
   void dispose() {
     _controller?.cancel();
+    _controller?.dispose();
     _taskCtrl.dispose();
     _taskFocus.dispose();
     _xCtrl.dispose();
@@ -188,13 +190,15 @@ class _MultiMousePageState extends State<MultiMousePage> {
 
   void _stop() {
     _controller?.cancel();
+    _controller?.stopEscWatcher();
     if (!mounted) return;
     setState(() {
       _running = false;
       _countdown = 0;
       _activeIndex = -1;
       _taskRunning = false;
-      _taskLabel = null;
+      _finished = true;
+      _taskLabel = AppStrings.taskStopped;
     });
   }
 
@@ -213,9 +217,11 @@ class _MultiMousePageState extends State<MultiMousePage> {
     );
 
     c.reset();
+    c.startEscWatcher(() => _stop());
     setState(() {
       _running = true;
       _taskRunning = true;
+      _finished = false;
       _error = null;
       _countdown = 3;
       _activeIndex = -1;
@@ -260,12 +266,25 @@ class _MultiMousePageState extends State<MultiMousePage> {
       if (mounted) setState(() => _error = e.toString());
     }
     if (!mounted) return;
+    final stopped = c.cancelled;
+    c.stopEscWatcher();
     setState(() {
       _running = false;
       _taskRunning = false;
       _activeIndex = -1;
-      _taskLabel = null;
+      _finished = true;
+      _taskLabel = stopped ? AppStrings.taskStopped : AppStrings.taskFinished;
     });
+    if (!stopped) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppStrings.taskFinished),
+          backgroundColor: Palette.raised,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override
@@ -296,6 +315,8 @@ class _MultiMousePageState extends State<MultiMousePage> {
                       _header(),
                       const SizedBox(height: 20),
                       if (_error != null) _errorBanner(),
+                      _aiTeamCard(),
+                      const SizedBox(height: 18),
                       if (wide)
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,8 +334,6 @@ class _MultiMousePageState extends State<MultiMousePage> {
                             _controls(),
                           ],
                         ),
-                      const SizedBox(height: 18),
-                      _aiTeamCard(),
                     ],
                   ),
                 ),
@@ -396,6 +415,18 @@ class _MultiMousePageState extends State<MultiMousePage> {
                 ),
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                suffixIcon: ListenableBuilder(
+                  listenable: _taskCtrl,
+                  builder: (_, _) => IconButton(
+                    tooltip: AppStrings.runTeam,
+                    onPressed: (_running || _taskCtrl.text.trim().isEmpty)
+                        ? null
+                        : _runTeamTask,
+                    icon: const Icon(Icons.send_rounded),
+                    color: Palette.accent,
+                    iconSize: 18,
+                  ),
+                ),
               ),
             ),
           ),
@@ -408,27 +439,60 @@ class _MultiMousePageState extends State<MultiMousePage> {
             const SizedBox(height: 10),
             Row(
               children: [
-                const SizedBox(
-                  width: 13,
-                  height: 13,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Palette.accent),
+                Icon(
+                  _finished
+                      ? (_taskLabel == AppStrings.taskStopped
+                          ? Icons.stop_circle_outlined
+                          : Icons.check_circle_rounded)
+                      : Icons.bolt_rounded,
+                  size: 15,
+                  color: _finished
+                      ? (_taskLabel == AppStrings.taskStopped ? Palette.danger : Palette.accent)
+                      : Palette.warn,
                 ),
-                const SizedBox(width: 9),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _taskLabel!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: Palette.accent),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: _finished ? Palette.text : Palette.accent,
+                    ),
                   ),
                 ),
-                Text(
-                  _activeIndex >= 0 ? AppStrings.cursorProgress(_activeIndex) : '',
-                  style: monoStyle(size: 11, color: Palette.muted),
-                ),
+                if (_running && _countdown == 0)
+                  Text(
+                    AppStrings.cursorsActive,
+                    style: const TextStyle(fontSize: 11, color: Palette.muted),
+                  ),
               ],
             ),
           ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (var i = 0; i < 10; i++) ...[
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: _running && i == _activeIndex
+                        ? Palette.warn
+                        : (_running ? Palette.accent : Palette.line),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                if (i != 9) const SizedBox(width: 5),
+              ],
+              const Spacer(),
+              Text(
+                '${_activeIndex >= 0 ? _activeIndex + 1 : 0}/10',
+                style: monoStyle(size: 11, color: Palette.muted),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           ListenableBuilder(
             listenable: _taskCtrl,
@@ -459,7 +523,7 @@ class _MultiMousePageState extends State<MultiMousePage> {
                 ),
                 const SizedBox(width: 10),
                 OutlinedButton.icon(
-                  onPressed: _running ? _stop : null,
+                  onPressed: (_running || _taskRunning) ? _stop : null,
                   icon: const Icon(Icons.stop_rounded, size: 16),
                   label: Text(AppStrings.stop),
                   style: OutlinedButton.styleFrom(
@@ -693,17 +757,19 @@ class _MultiMousePageState extends State<MultiMousePage> {
 
   Widget _controls() {
     return _panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: ExpansionTile(
+        initiallyExpanded: false,
+        leading: const Icon(Icons.tune_rounded, size: 18, color: Palette.accent),
+        title: const Text(
+          'Advanced settings',
+          style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+        ),
+        subtitle: const Text(
+          'Pattern, spacing, interval, precise coordinates',
+          style: TextStyle(fontSize: 11, color: Palette.muted),
+        ),
+        childrenPadding: const EdgeInsets.only(top: 8),
         children: [
-          const Row(
-            children: [
-              Icon(Icons.tune_rounded, size: 17, color: Palette.accent),
-              SizedBox(width: 8),
-              Text('Settings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(height: 16),
           Text(AppStrings.pattern, style: const TextStyle(fontSize: 12.5, color: Palette.muted)),
           const SizedBox(height: 8),
           Wrap(
@@ -878,14 +944,38 @@ class _MultiCursorPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
+    if (running && points.length > 1) {
+      final link = Paint()
+        ..color = Palette.accent.withValues(alpha: 0.18)
+        ..strokeWidth = 1.2;
+      for (var i = 0; i < points.length; i++) {
+        final next = points[(i + 1) % points.length];
+        canvas.drawLine(points[i], next, link);
+      }
+    }
+
     for (var i = 0; i < points.length; i++) {
       final p = points[i];
       final isActive = running && i == active;
-      final color = isActive ? Palette.warn : Palette.accent;
+      final color = running
+          ? (isActive ? Palette.warn : Palette.accent)
+          : Palette.muted;
       final halo = Paint()
-        ..color = color.withValues(alpha: isActive ? 0.28 : 0.10)
+        ..color = color.withValues(
+          alpha: isActive ? 0.38 : (running ? 0.24 : 0.10),
+        )
         ..style = PaintingStyle.fill;
-      canvas.drawCircle(p, isActive ? 15 : 11, halo);
+      canvas.drawCircle(p, isActive ? 17 : (running ? 14 : 11), halo);
+      if (running) {
+        canvas.drawCircle(
+          p,
+          isActive ? 17 : 14,
+          Paint()
+            ..color = color.withValues(alpha: 0.55)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.4,
+        );
+      }
 
       final arrow = Path()
         ..moveTo(p.dx, p.dy + 13)
