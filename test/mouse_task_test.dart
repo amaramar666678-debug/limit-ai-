@@ -12,6 +12,7 @@ void main() {
       pattern: MousePattern.grid,
       spacing: 60,
       screenCenter: const Offset(640, 400),
+      screenSize: const Size(1280, 800),
     );
 
     expect(
@@ -23,6 +24,14 @@ void main() {
       task.actions.any((a) => a.kind == TeamActionKind.escape),
       isFalse,
       reason: 'A synthetic Esc would trigger the global user-stop watcher',
+    );
+    expect(
+      task.actions.any((a) =>
+          a.kind == TeamActionKind.click &&
+          a.point != null &&
+          (a.point!.dy - 800 * 0.444).abs() < 1),
+      isTrue,
+      reason: 'The Play button is above centre, not below it',
     );
   });
 

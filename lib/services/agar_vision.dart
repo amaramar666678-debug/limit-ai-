@@ -143,6 +143,31 @@ class AgarVision {
     );
   }
 
+  /// One-shot diagnostic used by `tool/run_agar_once.dart`.
+  static Future<String> debugInspect() async {
+    try {
+      final cap = ScreenCapture.capture();
+      try {
+        final blobs = _blobs(cap);
+        final center = Offset(
+          cap.left + cap.width / 2,
+          cap.top + cap.height / 2,
+        );
+        final own = _ownCell(blobs, center);
+        final radii = blobs.map((b) => b.radius).toList()
+          ..sort((a, b) => b.compareTo(a));
+        return 'capture=${cap.width}x${cap.height}@(${cap.left},${cap.top}) '
+            'blobs=${blobs.length} '
+            'own=${own == null ? 'none' : 'r${own.radius.toStringAsFixed(1)}@(${own.x.round()},${own.y.round()})'} '
+            'topRadii=${radii.take(6).map((r) => r.toStringAsFixed(1)).join(',')}';
+      } finally {
+        cap.dispose();
+      }
+    } catch (e) {
+      return 'capture failed: $e';
+    }
+  }
+
   static List<_Blob> _blobs(ScreenCapture cap) {
     const step = 3;
     final gw = cap.width ~/ step;
@@ -223,16 +248,12 @@ class AgarVision {
 
   static _Blob? _ownCell(List<_Blob> blobs, Offset center) {
     _Blob? best;
-    var bestScore = double.infinity;
     for (final b in blobs) {
-      if (b.radius < 6 || b.radius > 140) continue;
-      final d = _distance(b.center, center);
-      // The camera follows the player, so our cell is near the arena center.
-      final score = d - b.radius * 0.25;
-      if (score < bestScore) {
-        bestScore = score;
-        best = b;
-      }
+      if (b.radius < 8 || b.radius > 140) continue;
+      // The camera follows the player: our cell is the largest cell close to
+      // the arena centre. Nearby pellets must not be mistaken for it.
+      if (_distance(b.center, center) > 110) continue;
+      if (best == null || b.radius > best.radius) best = b;
     }
     return best;
   }

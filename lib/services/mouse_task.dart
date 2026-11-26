@@ -81,6 +81,7 @@ class MouseTaskPlanner {
     required MousePattern pattern,
     required double spacing,
     Offset? screenCenter,
+    Size? screenSize,
   }) {
     final lower = prompt.toLowerCase();
     final isAgar = lower.contains('agar.io') ||
@@ -91,6 +92,7 @@ class MouseTaskPlanner {
     if (isAgar) {
       return agarGame(
         screenCenter: screenCenter ?? origin,
+        screenSize: screenSize ?? Size(origin.dx * 2, origin.dy * 2),
         spacing: spacing,
       );
     }
@@ -161,9 +163,25 @@ class MouseTaskPlanner {
   /// pointer. Agar.io follows mouse direction; clicks are only needed to start.
   static MouseTask agarGame({
     required Offset screenCenter,
+    required Size screenSize,
     required double spacing,
   }) {
-    final playPoint = Offset(screenCenter.dx, screenCenter.dy + 58);
+    // Measured on the live agar.io page: the Play button sits at ~44.4% of the
+    // window height, and the nickname field at ~38.4%. Using proportions keeps
+    // this correct with Windows DPI scaling (100%, 125%, 150%...).
+    final nickPoint = Offset(
+      screenSize.width / 2,
+      screenSize.height * 0.384,
+    );
+    final playPoint = Offset(
+      screenSize.width / 2,
+      screenSize.height * 0.444,
+    );
+    // A conservative ad-close guess near the top-right of the page content.
+    final adPoint = Offset(
+      screenSize.width * 0.94,
+      screenSize.height * 0.16,
+    );
     return MouseTask(
       title: AppStrings.agarGame,
       description: AppStrings.agarDescription,
@@ -176,45 +194,44 @@ class MouseTaskPlanner {
         ),
         TeamAction(
           TeamActionKind.delay,
-          durationMs: 5000,
+          durationMs: 6000,
           cursor: 1,
           label: AppStrings.waitResults,
         ),
-        // No synthetic Esc here: the global Esc watcher would treat it as the
-        // user stopping the task. Ads are skipped with clicks only.
+        // Click only; a synthetic Esc would trigger the global stop watcher.
         TeamAction(
           TeamActionKind.click,
-          point: Offset(screenCenter.dx * 2 - 110, 180),
-          cursor: 3,
+          point: adPoint,
+          cursor: 2,
           label: AppStrings.skipAd,
         ),
         TeamAction(
           TeamActionKind.click,
-          point: Offset(screenCenter.dx * 2 - 110, 240),
-          cursor: 4,
-          label: AppStrings.skipAd,
+          point: nickPoint,
+          cursor: 3,
+          label: AppStrings.focusGame,
         ),
         TeamAction(
           TeamActionKind.click,
           point: playPoint,
-          cursor: 5,
+          cursor: 4,
           label: AppStrings.clickPlay,
         ),
         TeamAction(
           TeamActionKind.delay,
-          durationMs: 500,
-          cursor: 3,
+          durationMs: 1200,
+          cursor: 5,
           label: AppStrings.waitResults,
         ),
         TeamAction(
           TeamActionKind.click,
-          point: Offset(screenCenter.dx, screenCenter.dy + 96),
+          point: playPoint,
           cursor: 6,
           label: AppStrings.clickPlay,
         ),
         TeamAction(
           TeamActionKind.delay,
-          durationMs: 900,
+          durationMs: 1200,
           cursor: 7,
           label: AppStrings.waitResults,
         ),
