@@ -142,6 +142,60 @@ class MouseController {
     }
   }
 
+  /// Human-like pointer play for games such as agar.io: short smooth darts,
+  /// small pauses and occasional clicks, instead of a mechanical orbit.
+  Future<void> playLikeHuman(
+    Offset center,
+    double radius, {
+    int durationMs = 15000,
+  }) async {
+    final screen = screenSize();
+    final rng = math.Random(DateTime.now().microsecondsSinceEpoch);
+    final stopwatch = Stopwatch()..start();
+    var current = center;
+
+    Offset clampPoint(Offset p) => Offset(
+          p.dx.clamp(0.0, screen.width).toDouble(),
+          p.dy.clamp(0.0, screen.height).toDouble(),
+        );
+
+    while (!_cancelled && stopwatch.elapsedMilliseconds < durationMs) {
+      final angle = rng.nextDouble() * math.pi * 2;
+      final distance = radius * (0.45 + rng.nextDouble() * 0.75);
+      final target = clampPoint(Offset(
+        center.dx + math.cos(angle) * distance,
+        center.dy + math.sin(angle) * distance,
+      ));
+
+      final steps = 7 + rng.nextInt(9);
+      for (var s = 1; s <= steps && !_cancelled; s++) {
+        final t = s / steps;
+        final eased = t * t * (3 - 2 * t); // smooth in/out
+        final p = clampPoint(Offset(
+          current.dx + (target.dx - current.dx) * eased,
+          current.dy + (target.dy - current.dy) * eased,
+        ));
+        _setCursorPos(p.dx.round(), p.dy.round());
+        await Future<void>.delayed(
+          Duration(milliseconds: 22 + rng.nextInt(16)),
+        );
+      }
+      if (_cancelled) break;
+      current = target;
+
+      // Occasional click to eject mass / interact with the game.
+      if (rng.nextInt(4) == 0) {
+        _press(0x0002, 0x0004);
+      }
+      // Brief human pause before the next move.
+      if (rng.nextInt(5) == 0) {
+        await Future<void>.delayed(
+          Duration(milliseconds: 110 + rng.nextInt(180)),
+        );
+      }
+    }
+  }
+
   Future<void> clickAt(
     Offset point, {
     bool doubleClick = false,

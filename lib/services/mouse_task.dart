@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../ui/strings.dart';
 import 'mouse_controller.dart';
 
-enum TeamActionKind { launch, paste, enter, click, doubleClick, move, steer, scroll, delay }
+enum TeamActionKind { launch, paste, enter, click, doubleClick, move, steer, play, scroll, delay }
 
 /// One atomic step carried out by a member of the ten-cursor team.
 class TeamAction {
@@ -142,7 +142,7 @@ class MouseTaskPlanner {
     required double spacing,
   }) {
     final playPoint = Offset(screenCenter.dx, screenCenter.dy + 58);
-    final radius = math.max(70.0, spacing * 1.5);
+    final radius = math.max(90.0, spacing * 2.2);
     return MouseTask(
       title: AppStrings.agarGame,
       description: AppStrings.agarDescription,
@@ -190,12 +190,12 @@ class MouseTaskPlanner {
           label: AppStrings.focusGame,
         ),
         TeamAction(
-          TeamActionKind.steer,
+          TeamActionKind.play,
           point: screenCenter,
           radius: radius,
-          durationMs: 15000,
+          durationMs: 20000,
           cursor: 7,
-          label: AppStrings.steerCell,
+          label: AppStrings.playingHuman,
         ),
       ],
     );
@@ -268,6 +268,15 @@ class MouseTaskRunner {
               a.point!,
               a.radius ?? 90,
               durationMs: a.durationMs ?? 8000,
+            );
+          }
+          break;
+        case TeamActionKind.play:
+          if (a.point != null) {
+            await controller.playLikeHuman(
+              a.point!,
+              a.radius ?? 90,
+              durationMs: a.durationMs ?? 15000,
             );
           }
           break;
