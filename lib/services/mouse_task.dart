@@ -177,11 +177,6 @@ class MouseTaskPlanner {
       screenSize.width / 2,
       screenSize.height * 0.444,
     );
-    // A conservative ad-close guess near the top-right of the page content.
-    final adPoint = Offset(
-      screenSize.width * 0.94,
-      screenSize.height * 0.16,
-    );
     return MouseTask(
       title: AppStrings.agarGame,
       description: AppStrings.agarDescription,
@@ -198,13 +193,8 @@ class MouseTaskPlanner {
           cursor: 1,
           label: AppStrings.waitResults,
         ),
-        // Click only; a synthetic Esc would trigger the global stop watcher.
-        TeamAction(
-          TeamActionKind.click,
-          point: adPoint,
-          cursor: 2,
-          label: AppStrings.skipAd,
-        ),
+        // No synthetic Esc and no blind ad click: both can hijack the page.
+        // Real ad overlays must be dismissed by their own Skip button.
         TeamAction(
           TeamActionKind.click,
           point: nickPoint,
