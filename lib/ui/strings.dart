@@ -142,8 +142,16 @@ class AppStrings {
 
   // Task status
   static String get taskFinished => t('Task finished', 'انتهت المهمة');
+  static String taskFinishedWithDetail(String detail) =>
+      t('Task finished: $detail', 'انتهت المهمة: $detail');
   static String get taskStopped => t('Task stopped', 'تم إيقاف المهمة');
   static String get cursorsActive => t('10 cursors active', '10 مؤشرات نشطة');
+  static String get agarDetected =>
+      t('game detected and played', 'تم التعرف على اللعبة واللعب');
+  static String get agarFallback => t(
+        'game not detected, fallback movement used',
+        'لم يتم التعرف على اللعبة، استُخدم تحرك احتياطي',
+      );
   static String clickDescription(bool doubleClick) => t(
         'Real ${doubleClick ? 'double ' : ''}clicks using the selected pattern',
         'نقرات ${doubleClick ? 'مزدوجة' : 'عادية'} حقيقية حسب النمط المختار',

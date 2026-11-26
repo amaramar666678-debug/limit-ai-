@@ -15,34 +15,62 @@ class _Blob {
   final int count;
 
   Offset get center => Offset(x, y);
-  double get radius => math.sqrt(count * 9 / math.pi); // step = 3
+  double get radius => math.sqrt(count * 9 / math.pi); // grid step = 3
+}
+
+/// Outcome of one play session, used by the UI so it never claims the task
+/// finished when the game was never actually detected.
+class AgarPlayResult {
+  const AgarPlayResult({
+    required this.detectedGame,
+    required this.moves,
+    required this.captures,
+  });
+
+  final bool detectedGame;
+  final int moves;
+  final int captures;
 }
 
 /// Reads the actual game screen and plays agar.io by its rules.
 class AgarVision {
-  static Future<void> play(
+  static Future<AgarPlayResult> play(
     MouseController controller, {
     int durationMs = 30000,
   }) async {
     final stopwatch = Stopwatch()..start();
     final rng = math.Random(DateTime.now().microsecondsSinceEpoch);
+    final screen = controller.screenSize();
     var current = controller.screenCenter();
     var lastSplit = DateTime.now().subtract(const Duration(seconds: 4));
+    var captures = 0;
+    var moves = 0;
+    var detectedGame = false;
+
+    Offset clampPoint(Offset p) => Offset(
+          p.dx.clamp(8.0, screen.width - 8).toDouble(),
+          p.dy.clamp(110, screen.height - 20).toDouble(),
+        );
+
+    Future<void> wander(Offset center) async {
+      final target = clampPoint(_randomPoint(center, 160, rng));
+      await controller.glideTo(current, target, steps: 12);
+      current = target;
+      moves++;
+    }
 
     while (!controller.cancelled && stopwatch.elapsedMilliseconds < durationMs) {
       ScreenCapture cap;
       try {
         cap = ScreenCapture.capture();
       } catch (_) {
-        await controller.glideTo(
-          current,
-          _randomPoint(controller.screenCenter(), 140, rng),
-          steps: 8,
-        );
-        current = controller.screenCenter();
+        // Capture can fail briefly while Chrome paints a new page. Keep playing
+        // instead of ending the task.
+        await wander(controller.screenCenter());
         continue;
       }
 
+      captures++;
       try {
         final blobs = _blobs(cap);
         final arenaCenter = Offset(
@@ -50,60 +78,69 @@ class AgarVision {
           cap.top + cap.height / 2,
         );
         final own = _ownCell(blobs, arenaCenter);
+
         if (own == null || blobs.length < 2) {
-          await controller.glideTo(
-            current,
-            _randomPoint(arenaCenter, 130, rng),
-            steps: 10,
-          );
-          current = arenaCenter;
+          // The game canvas was not recognised yet. Move like a player and wait
+          // for the next frame rather than reporting completion.
+          await wander(arenaCenter);
           continue;
         }
 
+        detectedGame = true;
         final others = blobs.where((b) => b != own).toList();
         final threats = <_Blob>[
           ...others.where((b) =>
-              b.radius > own.radius * 1.18 && _distance(b.center, own.center) < 320),
-        ]..sort((a, b) => _distance(a.center, own.center).compareTo(_distance(b.center, own.center)));
+              b.radius > own.radius * 1.18 &&
+              _distance(b.center, own.center) < 340),
+        ]..sort((a, b) => _distance(a.center, own.center).compareTo(
+              _distance(b.center, own.center)));
 
         final food = <_Blob>[
           ...others.where((b) =>
-              b.radius < own.radius * 0.78 && _distance(b.center, own.center) < 560),
-        ]..sort((a, b) => _distance(a.center, own.center).compareTo(_distance(b.center, own.center)));
+              b.radius < own.radius * 0.78 &&
+              _distance(b.center, own.center) < 620),
+        ]..sort((a, b) => _distance(a.center, own.center).compareTo(
+              _distance(b.center, own.center)));
 
         Offset target;
         if (threats.isNotEmpty) {
+          // Flee the nearest bigger cell.
           final t = threats.first;
           final dx = own.x - t.x;
           final dy = own.y - t.y;
           final len = math.max(1.0, math.sqrt(dx * dx + dy * dy));
-          target = Offset(own.x + dx / len * 230, own.y + dy / len * 230);
+          target = clampPoint(
+            Offset(own.x + dx / len * 260, own.y + dy / len * 260),
+          );
         } else if (food.isNotEmpty) {
+          // Eat the nearest smaller cell / pellet.
           final f = food.first;
-          target = f.center;
+          target = clampPoint(f.center);
           final d = _distance(f.center, own.center);
-          if (f.radius > own.radius * 0.42 &&
-              d < 180 &&
+          if (f.radius > own.radius * 0.40 &&
+              d < 190 &&
               DateTime.now().difference(lastSplit) > const Duration(seconds: 2)) {
             await controller.pressSpace();
             lastSplit = DateTime.now();
           }
         } else {
-          target = _randomPoint(arenaCenter, 170, rng);
+          target = clampPoint(_randomPoint(arenaCenter, 180, rng));
         }
 
-        final screen = controller.screenSize();
-        target = Offset(
-          target.dx.clamp(10.0, screen.width - 10).toDouble(),
-          target.dy.clamp(10.0, screen.height - 10).toDouble(),
-        );
         await controller.glideTo(current, target, steps: 12);
         current = target;
+        moves++;
       } finally {
         cap.dispose();
       }
       await Future<void>.delayed(const Duration(milliseconds: 35));
     }
+
+    return AgarPlayResult(
+      detectedGame: detectedGame,
+      moves: moves,
+      captures: captures,
+    );
   }
 
   static List<_Blob> _blobs(ScreenCapture cap) {
@@ -125,7 +162,9 @@ class AgarVision {
         final b = cap.blueAt(x, y);
         final hi = math.max(r, math.max(g, b));
         final lo = math.min(r, math.min(g, b));
-        if (hi - lo > 42 && hi > 100 && lo < 235) {
+        // Lower threshold than before: agar.io cells are often pastel, not
+        // fully saturated.
+        if (hi - lo > 26 && hi > 115 && lo < 244) {
           mask[gy * gw + gx] = 1;
         }
       }
@@ -158,16 +197,18 @@ class AgarVision {
         count++;
         for (final n in [idx - 1, idx + 1, idx - gw, idx + gw]) {
           if (n < 0 || n >= mask.length) continue;
-          if ((n == idx - 1 && gx == 0) || (n == idx + 1 && gx == gw - 1)) continue;
+          if ((n == idx - 1 && gx == 0) || (n == idx + 1 && gx == gw - 1)) {
+            continue;
+          }
           if (visited[n] == 0 && mask[n] == 1) {
             visited[n] = 1;
             queue.add(n);
           }
         }
       }
-      if (count < 3 || count > 1800) continue;
+      if (count < 3 || count > 2400) continue;
       final radius = math.sqrt(count * step * step / math.pi);
-      if (radius < 3.5 || radius > 150) continue;
+      if (radius < 3.0 || radius > 170) continue;
       blobs.add(_Blob(
         cap.left + (sx / count) * step,
         cap.top + (sy / count) * step,
@@ -184,9 +225,9 @@ class AgarVision {
     _Blob? best;
     var bestScore = double.infinity;
     for (final b in blobs) {
-      if (b.radius < 7 || b.radius > 130) continue;
+      if (b.radius < 6 || b.radius > 140) continue;
       final d = _distance(b.center, center);
-      // Camera follows the player, so our cell is near the arena center.
+      // The camera follows the player, so our cell is near the arena center.
       final score = d - b.radius * 0.25;
       if (score < bestScore) {
         bestScore = score;
@@ -201,7 +242,11 @@ class AgarVision {
 
   static Offset _randomPoint(Offset center, double radius, math.Random rng) {
     final a = rng.nextDouble() * math.pi * 2;
-    final r = radius * (0.4 + rng.nextDouble() * 0.8);
-    return Offset(center.dx + math.cos(a) * r, center.dy + math.sin(a) * r);
+    const r = 0.4;
+    final distance = radius * (r + rng.nextDouble() * 0.8);
+    return Offset(
+      center.dx + math.cos(a) * distance,
+      center.dy + math.sin(a) * distance,
+    );
   }
 }

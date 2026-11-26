@@ -72,6 +72,7 @@ class MouseController {
 
   Timer? _escWatcher;
   bool _escWasDown = false;
+  DateTime? _ignoreEscapeUntil;
 
   void reset() => _cancelled = false;
   void cancel() => _cancelled = true;
@@ -82,7 +83,9 @@ class MouseController {
     _escWasDown = false;
     _escWatcher = Timer.periodic(const Duration(milliseconds: 40), (_) {
       final down = (_getAsyncKeyState(_vkEscape) & 0x8000) != 0;
-      if (down && !_escWasDown) onEscape();
+      final ignored = _ignoreEscapeUntil != null &&
+          DateTime.now().isBefore(_ignoreEscapeUntil!);
+      if (down && !_escWasDown && !ignored) onEscape();
       _escWasDown = down;
     });
   }
@@ -250,6 +253,9 @@ class MouseController {
 
   Future<void> pressEscape() async {
     if (_cancelled) return;
+    // A synthetic Escape (e.g. skipping an ad) must not trigger the user-stop
+    // watcher.
+    _ignoreEscapeUntil = DateTime.now().add(const Duration(milliseconds: 320));
     _tap(_vkEscape);
   }
 

@@ -36,10 +36,10 @@
 - **10 cursors** that move and click in patterns: row, column, 5×2 grid, circle, and diagonal.
 - **Agent team control**: the command field is focused as soon as you open Multi Mause; type something like `open Chrome and search for cat images` and press **Enter** to start. The instruction is sent to the agent while the team carries it out on the desktop.
 - Real keyboard automation (Win+R, paste, Enter) to launch Chrome and search for images or information, with clipboard settle delays so characters are not scrambled.
-- **Mouse-driven games**: say `play agar.io` and the team opens the game, attempts to skip ads, then reads the screen with GDI capture to eat smaller cells, flee bigger cells and split with **Space** (Esc stops).
+- **Mouse-driven games**: say `play agar.io` and the team opens the game, attempts to skip ads with clicks, then reads the screen with GDI capture to eat smaller cells, flee bigger cells and split with **Space**. A synthetic Esc is never sent by the team, so it cannot stop its own task; only the user's Esc or Stop button does. (Esc stops.)
 - **Precise control** with manual `X / Y` coordinates plus Move/Click buttons.
 - Adjustable spacing and click interval, double-click mode, 3-second countdown, live preview, and instant stop with **Esc** (global, works even when Chrome has focus) or the Stop button.
-- The command box is the primary focus: type and press **Enter** or the send icon. A clear **Task finished / Task stopped** status appears when the run ends.
+- The command box is the primary focus: type and press **Enter** or the send icon. A truthful status appears when the run ends: **Task stopped** on cancel, otherwise **Task finished: game detected and played** or **Task finished: game not detected, fallback movement used** — it never claims completion before the play loop has actually run.
 
 ### Language
 - English is the default language.

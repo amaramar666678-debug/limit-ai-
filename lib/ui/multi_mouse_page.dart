@@ -260,25 +260,32 @@ class _MultiMousePageState extends State<MultiMousePage> {
       },
     );
 
+    MouseTaskResult? result;
     try {
-      await runner.run(task);
+      result = await runner.run(task);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }
     if (!mounted) return;
-    final stopped = c.cancelled;
+    final stopped = (result?.cancelled ?? false) || c.cancelled;
+    final detail = result?.detail;
+    final label = stopped
+        ? AppStrings.taskStopped
+        : (detail == null
+            ? AppStrings.taskFinished
+            : AppStrings.taskFinishedWithDetail(detail));
     c.stopEscWatcher();
     setState(() {
       _running = false;
       _taskRunning = false;
       _activeIndex = -1;
       _finished = true;
-      _taskLabel = stopped ? AppStrings.taskStopped : AppStrings.taskFinished;
+      _taskLabel = label;
     });
     if (!stopped) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppStrings.taskFinished),
+          content: Text(label),
           backgroundColor: Palette.raised,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),

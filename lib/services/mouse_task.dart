@@ -51,6 +51,15 @@ class MouseTask {
   final List<TeamAction> actions;
 }
 
+/// Truthful outcome of a run, so the UI does not say "finished" when the game
+/// was never detected or the user cancelled.
+class MouseTaskResult {
+  const MouseTaskResult({required this.cancelled, this.detail});
+
+  final bool cancelled;
+  final String? detail;
+}
+
 /// Turns a natural-language instruction into a concrete, reviewable team plan.
 class MouseTaskPlanner {
   static final _strip = RegExp(
@@ -171,11 +180,8 @@ class MouseTaskPlanner {
           cursor: 1,
           label: AppStrings.waitResults,
         ),
-        TeamAction(
-          TeamActionKind.escape,
-          cursor: 2,
-          label: AppStrings.skipAd,
-        ),
+        // No synthetic Esc here: the global Esc watcher would treat it as the
+        // user stopping the task. Ads are skipped with clicks only.
         TeamAction(
           TeamActionKind.click,
           point: Offset(screenCenter.dx * 2 - 110, 180),
@@ -262,8 +268,9 @@ class MouseTaskRunner {
   final MouseController controller;
   final void Function(int index, TeamAction action)? onStep;
 
-  Future<void> run(MouseTask task) async {
+  Future<MouseTaskResult> run(MouseTask task) async {
     controller.reset();
+    AgarPlayResult? playResult;
     for (var i = 0; i < task.actions.length; i++) {
       if (controller.cancelled) break;
       final a = task.actions[i];
@@ -308,7 +315,10 @@ class MouseTaskRunner {
           }
           break;
         case TeamActionKind.visionPlay:
-          await AgarVision.play(controller, durationMs: a.durationMs ?? 30000);
+          playResult = await AgarVision.play(
+            controller,
+            durationMs: a.durationMs ?? 30000,
+          );
           break;
         case TeamActionKind.escape:
           await controller.pressEscape();
@@ -328,5 +338,13 @@ class MouseTaskRunner {
         await Future<void>.delayed(const Duration(milliseconds: 24));
       }
     }
+    return MouseTaskResult(
+      cancelled: controller.cancelled,
+      detail: playResult == null
+          ? null
+          : (playResult.detectedGame
+              ? AppStrings.agarDetected
+              : AppStrings.agarFallback),
+    );
   }
 }
